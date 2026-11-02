@@ -611,6 +611,7 @@ class CounterSyncStore {
       buyerName: `${preOrder.buyerName} [${preOrder.token}]`,
       buyerPhone: preOrder.phone,
       type: "PREORDER_FULFILLMENT",
+      preOrderToken: preOrder.token,
       voided: false
     };
 
@@ -675,8 +676,67 @@ class CounterSyncStore {
     txn.voidedAt = new Date().toISOString();
     txn.voidedBy = voidedBy || "Authorized Staff";
 
+    // If this transaction was linked to a pre-order, restore pre-order to normal PENDING state!
+    if (txn.type === "PREORDER_FULFILLMENT" || txn.preOrderToken) {
+      let token = txn.preOrderToken;
+      if (!token && txn.buyerName) {
+        const bracketMatch = txn.buyerName.match(/\[(.*?)\]/);
+        if (bracketMatch) token = bracketMatch[1];
+        else {
+          const tokenMatch = txn.buyerName.match(/([A-Z0-9]+-[0-9]+-[0-9]+)/);
+          if (tokenMatch) token = tokenMatch[1];
+        }
+      }
+      if (token) {
+        const preOrder = (event.preOrders || []).find(p => p.token.toLowerCase() === token.toLowerCase().trim());
+        if (preOrder) {
+          preOrder.status = "PENDING";
+          delete preOrder.fulfilledAt;
+          delete preOrder.fulfilledByCounter;
+        }
+      }
+    }
+
     this.saveData(data);
     return txn;
+  }
+
+  // --- Add Fresh Press Batch ---
+  addPressBatch({ eventKey, copies, batchNumber, pressName, notes, loggedBy }) {
+    const data = this.getData();
+    const event = data.events[eventKey];
+    if (!event) throw new Error("Event not found");
+
+    const qty = parseInt(copies, 10);
+    if (isNaN(qty) || qty <= 0) throw new Error("Please enter a valid number of copies");
+
+    if (!event.stockRoom) {
+      event.stockRoom = {
+        totalPressInflow: 0,
+        vaultReserve: 0,
+        corrections: [],
+        vaultGiveaways: [],
+        pressBatches: []
+      };
+    }
+    if (!event.stockRoom.pressBatches) event.stockRoom.pressBatches = [];
+
+    const batch = {
+      id: `BATCH-${Date.now().toString().slice(-5)}`,
+      batchNumber: batchNumber || `B-${Date.now().toString().slice(-4)}`,
+      timestamp: new Date().toISOString(),
+      copies: qty,
+      pressName: pressName || "Standard Offset Press",
+      notes: notes || "Consignment received from press",
+      loggedBy: loggedBy || (event.stockRoom.keeperName || "Stock Room Keeper")
+    };
+
+    event.stockRoom.pressBatches.unshift(batch);
+    event.stockRoom.totalPressInflow = (event.stockRoom.totalPressInflow || 0) + qty;
+    event.stockRoom.vaultReserve = (event.stockRoom.vaultReserve || 0) + qty;
+
+    this.saveData(data);
+    return batch;
   }
 
   // --- Ledger & Metrics Computations ---

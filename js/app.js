@@ -1357,9 +1357,9 @@
     const countEl = document.getElementById('counter-ledger-count');
     if (!container || !event) return;
 
-    // Filter today's shift metrics for this counter and sort NEWEST FIRST (most recent at top)
+    // Filter active (non-voided) shift transactions for this counter, sorted newest first
     const txns = (event.transactions || [])
-      .filter(t => t.counterId === state.counterId)
+      .filter(t => t.counterId === state.counterId && !t.voided)
       .slice()
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
@@ -1469,9 +1469,12 @@
 
       if (el.modalVoidTxn) el.modalVoidTxn.classList.add('hidden');
       CS_Audio.alertWarning();
-      showToast('Sale Cancelled! Copies successfully restored to shelf.', 'success');
+      showToast('Sale Cancelled! Copies & pre-order status restored.', 'success');
       renderPOSWorkspace();
+      renderPreOrdersList();
+      renderCounterShiftLedger();
       if (state.currentView === 'admin') renderAdminDashboard();
+      if (state.currentView === 'stockroom') renderStockRoomWorkspace();
     } catch (err) {
       CS_Audio.alertWarning();
       showToast(err.message, 'error');
@@ -1764,6 +1767,79 @@
         showToast(err.message, 'error');
       }
     });
+
+    // 3.5 Add Press Batch to Vault Modal triggers
+    const btnOpenPress = document.getElementById('btn-open-add-press-batch');
+    if (btnOpenPress) {
+      btnOpenPress.addEventListener('click', () => {
+        const event = CS_Store.getEvent(state.eventKey);
+        const batches = (event && event.stockRoom && event.stockRoom.pressBatches) || [];
+        const nextNum = (batches.length + 1).toString().padStart(2, '0');
+        const batchNumInput = document.getElementById('press-batch-number');
+        if (batchNumInput) batchNumInput.value = `BATCH-${nextNum}`;
+        const qtyInput = document.getElementById('press-batch-qty');
+        if (qtyInput) qtyInput.value = '500';
+        const sourceInput = document.getElementById('press-batch-source');
+        if (sourceInput) sourceInput.value = '';
+        const notesInput = document.getElementById('press-batch-notes');
+        if (notesInput) notesInput.value = '';
+
+        const modal = document.getElementById('modal-add-press-batch');
+        if (modal) {
+          modal.classList.remove('hidden');
+          if (qtyInput) setTimeout(() => qtyInput.focus(), 60);
+        }
+      });
+    }
+
+    // Quick quantity preset pills for press batch
+    document.querySelectorAll('.btn-press-preset').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const qty = e.target.dataset.qty;
+        const qtyInput = document.getElementById('press-batch-qty');
+        if (qtyInput && qty) {
+          qtyInput.value = qty;
+        }
+      });
+    });
+
+    // Submit Press Batch
+    const btnSubmitPress = document.getElementById('btn-submit-press-batch');
+    if (btnSubmitPress) {
+      btnSubmitPress.addEventListener('click', () => {
+        const qty = parseInt(document.getElementById('press-batch-qty').value, 10);
+        const batchNumber = document.getElementById('press-batch-number').value.trim();
+        const pressName = document.getElementById('press-batch-source').value.trim();
+        const notes = document.getElementById('press-batch-notes').value.trim();
+
+        if (isNaN(qty) || qty <= 0) {
+          showToast('Please enter a valid number of copies (> 0)', 'error');
+          return;
+        }
+
+        try {
+          const batch = CS_Store.addPressBatch({
+            eventKey: state.eventKey,
+            copies: qty,
+            batchNumber,
+            pressName,
+            notes,
+            loggedBy: 'Central Stock Room Keeper'
+          });
+
+          const modal = document.getElementById('modal-add-press-batch');
+          if (modal) modal.classList.add('hidden');
+
+          CS_Audio.handshakeSuccess();
+          showToast(`✓ Received +${qty.toLocaleString('en-IN')} copies (${batch.batchNumber}) into Vault!`, 'success');
+          renderStockRoomWorkspace();
+          if (state.currentView === 'admin') renderAdminDashboard();
+        } catch (err) {
+          CS_Audio.alertWarning();
+          showToast(err.message, 'error');
+        }
+      });
+    }
   }
 
   function renderStockRoomWorkspace() {
@@ -1792,6 +1868,88 @@
     document.getElementById('sr-kpi-reserve').textContent = metrics.reserveInStockRoom.toLocaleString('en-IN');
     document.getElementById('sr-kpi-distributed').textContent = (metrics.activeCountersStock + metrics.totalCopiesSold).toLocaleString('en-IN');
     document.getElementById('sr-kpi-giveaway').textContent = metrics.totalVIPCopies.toLocaleString('en-IN');
+
+    // 3.2 Individual Counters Live Stock Status Monitor
+    const counters = event.counters || [];
+    const counterStockTbody = document.getElementById('sr-counters-stock-tbody');
+    const totalCountersPill = document.getElementById('sr-active-counters-pill');
+    const totalFieldCopiesEl = document.getElementById('sr-total-field-copies');
+
+    if (totalCountersPill) totalCountersPill.textContent = `${counters.length} Counters Active`;
+    const totalFieldStock = counters.reduce((sum, c) => sum + (c.currentStock || 0), 0);
+    if (totalFieldCopiesEl) totalFieldCopiesEl.textContent = totalFieldStock.toLocaleString('en-IN');
+
+    if (counterStockTbody) {
+      counterStockTbody.innerHTML = '';
+      if (counters.length === 0) {
+        counterStockTbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: var(--text-muted);">No sales counters registered for this event.</td></tr>`;
+      } else {
+        counters.forEach(c => {
+          const breakdown = (metrics.counterBreakdown || []).find(b => b.id === c.id) || {};
+          const soldCount = breakdown.copiesSold || 0;
+          const vipCount = breakdown.copiesVip || 0;
+          const suppliedCount = breakdown.stockSupplied || (c.initialStock || c.currentStock);
+          const inTransitCount = (event.dispatches || []).filter(d => d.counterId === c.id && d.status === 'IN_TRANSIT').reduce((s, d) => s + d.copies, 0);
+
+          let statusBadge = '';
+          if (c.currentStock <= 10) {
+            statusBadge = `<span class="stock-pill low">⚠️ LOW (≤10)</span>`;
+          } else if (c.currentStock <= 25) {
+            statusBadge = `<span class="stock-pill" style="background: rgba(245, 158, 11, 0.15); color: #F59E0B; border: 1px solid rgba(245, 158, 11, 0.3);">⚡ MODERATE</span>`;
+          } else {
+            statusBadge = `<span class="stock-pill" style="background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3);">✓ HEALTHY</span>`;
+          }
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>
+              <strong>${c.name}</strong><br>
+              <span style="font-size: 0.75rem; color: var(--text-muted);">PIN: ${c.pin}</span>
+            </td>
+            <td>
+              <span style="font-weight: 600;">${c.volunteers}</span><br>
+              <span style="font-size: 0.72rem; color: var(--cs-electric-blue); font-family: monospace;">${c.upiId || ''}</span>
+            </td>
+            <td>
+              <span class="${c.currentStock <= 10 ? 'text-rose' : 'text-blue'}" style="font-size: 1.15rem; font-weight: 800;">${c.currentStock}</span>
+              <span style="font-size: 0.75rem; color: var(--text-muted);">copies</span>
+            </td>
+            <td>${statusBadge}</td>
+            <td><strong>${suppliedCount}</strong> <span style="font-size:0.75rem; color:var(--text-muted);">copies</span></td>
+            <td>
+              <strong class="text-blue">${soldCount}</strong>
+              ${vipCount > 0 ? `<span style="font-size: 0.75rem; color: #9333EA;"> (+${vipCount} VIP)</span>` : ''}
+            </td>
+            <td>
+              ${inTransitCount > 0 
+                ? `<span style="color: var(--cs-cyan); font-weight: 700;">🚚 +${inTransitCount} in transit</span>` 
+                : `<span style="color: var(--text-muted); font-size: 0.8rem;">None</span>`}
+            </td>
+            <td>
+              <button type="button" class="btn-pill btn-pill-primary sr-btn-dispatch-counter" data-cid="${c.id}" style="padding: 4px 10px; font-size: 0.78rem;">
+                📦 Dispatch
+              </button>
+            </td>
+          `;
+
+          const btnDispatch = tr.querySelector('.sr-btn-dispatch-counter');
+          if (btnDispatch) {
+            btnDispatch.addEventListener('click', () => {
+              if (select) select.value = c.id;
+              const qtyInput = document.getElementById('dispatch-qty');
+              if (qtyInput) {
+                qtyInput.value = c.currentStock <= 10 ? '50' : '25';
+                qtyInput.focus();
+                qtyInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+              showToast(`Selected ${c.name} for dispatch. Set quantity and confirm.`, 'info');
+            });
+          }
+
+          counterStockTbody.appendChild(tr);
+        });
+      }
+    }
 
     // In-Transit Table
     const dispatches = event.dispatches || [];

@@ -22,7 +22,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800;900&family=Manjari:wght@400;700&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- Bulletproof Standalone CSS -->
-  <link rel="stylesheet" href="./css/style.css?v=8">
+  <link rel="stylesheet" href="./css/style.css?v=9">
 </head>
 <body>
   <div id="app">
@@ -128,7 +128,7 @@
             <div class="field-group">
               <label class="field-label" for="input-event-key">ENTER EVENT ACCESS KEY</label>
               <div class="input-with-action">
-                <input type="text" id="input-event-key" class="access-key-inline" value="" maxlength="8" placeholder="CS2026" autofocus>
+                <input type="text" id="input-event-key" class="access-key-inline" value="" maxlength="8" placeholder="" autofocus>
                 <button id="btn-validate-key" class="btn-input-verify" type="button">Verify</button>
               </div>
               <div class="field-helper">Type the access key given by your event organizer</div>
@@ -579,7 +579,13 @@
         <!-- 3.1 Central Inventory Dashboard 4 KPIs -->
         <div class="stockroom-kpi-grid">
           <div class="kpi-tile" style="border-top: 4px solid var(--cs-electric-blue);">
-            <div class="kpi-tile-title">Total Press Inflow</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <div class="kpi-tile-title" style="margin-bottom: 0;">Total Press Inflow</div>
+              <button id="btn-open-add-press-batch" type="button" class="btn-press-add-mini" title="Add fresh batch of books arriving from press">
+                <span style="font-size: 1.05rem; line-height: 1; font-weight: 800;">+</span>
+                <span>Add Batch</span>
+              </button>
+            </div>
             <div id="sr-kpi-inflow" class="kpi-tile-value">2,500</div>
             <div class="kpi-tile-sub">Print runs delivered from press</div>
           </div>
@@ -601,6 +607,38 @@
             <div id="sr-kpi-giveaway" class="kpi-tile-value text-amber">50</div>
             <div class="kpi-tile-sub">Direct vault dignitary issues</div>
           </div>
+        </div>
+
+        <!-- 3.2 Individual Counters Live Stock Status Monitor -->
+        <div class="data-table-wrapper" style="margin-bottom: 24px;">
+          <div class="data-table-header">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <h3 style="display: flex; align-items: center; gap: 8px;">
+                <span>🏪 Individual Counters Stock Status</span>
+              </h3>
+              <span class="stock-pill" id="sr-active-counters-pill">4 Counters Active</span>
+            </div>
+            <div style="font-size: 0.82rem; color: var(--text-secondary);">
+              Field Total: <strong id="sr-total-field-copies" style="color: var(--cs-cyan); font-weight: 800;">0</strong> copies across counters
+            </div>
+          </div>
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th>Counter Name</th>
+                <th>Volunteers</th>
+                <th>Shelf Stock</th>
+                <th>Status</th>
+                <th>Supplied</th>
+                <th>Sold</th>
+                <th>In Transit</th>
+                <th>Quick Action</th>
+              </tr>
+            </thead>
+            <tbody id="sr-counters-stock-tbody">
+              <!-- Dynamically populated from event.counters & metrics -->
+            </tbody>
+          </table>
         </div>
 
         <!-- Warehouse Action Form Cards -->
@@ -1134,6 +1172,49 @@
       </div>
     </div>
 
+    <!-- 5.5 Add Press Batch to Stock Room Modal -->
+    <div id="modal-add-press-batch" class="modal-overlay hidden">
+      <div class="modal-content" style="max-width: 440px;">
+        <div class="modal-header">
+          <h3 style="color: var(--cs-electric-blue);">📦 Add Press Batch to Vault</h3>
+          <button class="modal-close-btn" data-close-modal="modal-add-press-batch" id="btn-close-press-batch">✕</button>
+        </div>
+        <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 16px;">
+          Log fresh physical print runs arriving at the Central Stock Room. Automatically increments Total Press Inflow and Vault Reserve.
+        </p>
+
+        <div style="margin-bottom: 12px;">
+          <label class="input-label" for="press-batch-number">Batch / Delivery Challan ID</label>
+          <input type="text" id="press-batch-number" placeholder="e.g. BATCH-04 or DC-8821">
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <label class="input-label" for="press-batch-qty">Copies Received *</label>
+          <input type="number" id="press-batch-qty" min="1" max="100000" placeholder="e.g. 500" value="500">
+          <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn-pill btn-pill-subtle btn-press-preset" data-qty="100">+100</button>
+            <button type="button" class="btn-pill btn-pill-subtle btn-press-preset" data-qty="250">+250</button>
+            <button type="button" class="btn-pill btn-pill-subtle btn-press-preset" data-qty="500">+500</button>
+            <button type="button" class="btn-pill btn-pill-subtle btn-press-preset" data-qty="1000">+1,000</button>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <label class="input-label" for="press-batch-source">Press / Printing Provider</label>
+          <input type="text" id="press-batch-source" placeholder="e.g. Al-Huda Offset Press, Kozhikode">
+        </div>
+
+        <div style="margin-bottom: 18px;">
+          <label class="input-label" for="press-batch-notes">Notes / Consignment Details</label>
+          <input type="text" id="press-batch-notes" placeholder="e.g. Morning consignment, 10 bundles of 50">
+        </div>
+
+        <button id="btn-submit-press-batch" class="btn-complete-sale" type="button" style="height: 48px; font-size: 1rem;">
+          Add to Vault Reserve ✓
+        </button>
+      </div>
+    </div>
+
     <!-- 6. Google Sign-In Simulation Modal -->
     <div id="modal-google-auth" class="modal-overlay hidden">
       <div class="modal-content" style="max-width: 400px; text-align: center;">
@@ -1190,9 +1271,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="./js/qrcode.js?v=8"></script>
-  <script src="./js/seed.js?v=8"></script>
-  <script src="./js/store.js?v=8"></script>
-  <script src="./js/app.js?v=8"></script>
+  <script src="./js/qrcode.js?v=9"></script>
+  <script src="./js/seed.js?v=9"></script>
+  <script src="./js/store.js?v=9"></script>
+  <script src="./js/app.js?v=9"></script>
 </body>
 </html>
