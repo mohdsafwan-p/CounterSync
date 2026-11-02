@@ -35,23 +35,38 @@ class CounterSyncStore {
   }
 
   _ensureInitialized() {
+    const CURRENT_VERSION = 12;
     const raw = localStorage.getItem(this.STORAGE_KEY);
-    if (!raw) {
+    const ver = parseInt(localStorage.getItem(this.STORAGE_KEY + '_ver') || '0', 10);
+
+    if (!raw || ver < CURRENT_VERSION) {
       this.resetToSeed();
-    } else {
-      try {
-        const data = JSON.parse(raw);
-        if (data && data.events && data.events["CS2026"]) {
-          data.events["CS2026"].name = "Almuneer 2026";
-          const c1 = data.events["CS2026"].counters.find(c => c.id === "counter-01a");
-          if (c1) {
-            c1.name = "Counter 01A";
-            c1.volunteers = "Safwan, Rashid";
-          }
-          localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
-        }
-      } catch (e) {}
+      localStorage.setItem(this.STORAGE_KEY + '_ver', String(CURRENT_VERSION));
+      return;
     }
+
+    try {
+      const data = JSON.parse(raw);
+      if (data && data.events && data.events["CS2026"]) {
+        const ev = data.events["CS2026"];
+        ev.name = "Almuneer 2026";
+        ev.unitPrice = 100;
+        ev.bookTitle = "Chronicles of Almuneer (Festival Commemorative Edition)";
+
+        // Eliminate any stale 250 unitPrice across existing cached transactions
+        if (ev.transactions) {
+          ev.transactions.forEach(t => {
+            if (t.unitPrice === 250) {
+              t.unitPrice = 100;
+              if (t.paymentMode !== 'FREE_VIP' && t.type !== 'VIP') {
+                t.totalAmount = (t.copies || 1) * 100;
+              }
+            }
+          });
+        }
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+      }
+    } catch (e) {}
   }
 
   resetToSeed() {
@@ -156,7 +171,7 @@ class CounterSyncStore {
       throw new Error(`Event key "${cleanKey}" already exists.`);
     }
 
-    const price = parseInt(unitPrice, 10) || 250;
+    const price = parseInt(unitPrice, 10) || 100;
     const inflow = parseInt(pressInflow, 10) || 1000;
 
     data.events[cleanKey] = {

@@ -266,12 +266,15 @@
     if (viewName === 'pos') {
       const counter = CS_Store.getCounter(state.eventKey, state.counterId);
       el.headerEventLabel.textContent = `${state.eventKey} • ${counter ? counter.name.split('(')[0].trim() : 'Counter'}`;
+      if (el.headerStaffPill) el.headerStaffPill.textContent = 'Sales';
       renderPOSWorkspace();
     } else if (viewName === 'stockroom') {
       el.headerEventLabel.textContent = `${state.eventKey} • Central Stock Room`;
+      if (el.headerStaffPill) el.headerStaffPill.textContent = 'Stock';
       renderStockRoomWorkspace();
     } else if (viewName === 'admin') {
       el.headerEventLabel.textContent = `${state.eventKey} • Master Super Admin`;
+      if (el.headerStaffPill) el.headerStaffPill.textContent = 'Admin';
       renderAdminDashboard();
     }
 
@@ -1290,34 +1293,29 @@
 
     // Header labels
     if (el.headerEventSub) el.headerEventSub.textContent = event.name;
-    if (el.headerStaffPill) el.headerStaffPill.textContent = 'STAFF';
+    if (el.headerStaffPill) el.headerStaffPill.textContent = 'Sales';
 
-    // Top Card
+    // Top Card & Unified Ledger Metrics
     if (el.posCounterName) el.posCounterName.textContent = counter.name;
     if (el.posVolunteers) el.posVolunteers.textContent = `Volunteers: ${counter.volunteers}`;
-    if (el.heroStockCount) el.heroStockCount.textContent = counter.currentStock;
+
+    // Compute unified metrics from balanced store ledger for 100% data uniformity
+    const metrics = CS_Store.getBalancedLedgerMetrics(state.eventKey, 'ALL');
+    const breakdown = (metrics && metrics.counterBreakdown) 
+      ? metrics.counterBreakdown.find(b => b.id === counter.id) 
+      : null;
+
+    const remainingStock = breakdown ? breakdown.currentStock : counter.currentStock;
+    const soldCopies = breakdown ? breakdown.copiesSold : 0;
+    const grandRev = breakdown ? breakdown.totalNetCollection : 0;
+
+    if (el.heroStockCount) el.heroStockCount.textContent = remainingStock;
 
     // Requirement 2.1: Remaining copies color changes to bold red when stock <= 10
-    const isLow = counter.currentStock <= 10;
+    const isLow = remainingStock <= 10;
     if (el.heroStockBox) el.heroStockBox.classList.toggle('low-stock', isLow);
 
-    // Filter today's shift metrics for this counter
-    const today = new Date().toISOString().slice(0, 10);
-    const counterTxns = (event.transactions || [])
-      .filter(t => t.counterId === counter.id && !t.voided && t.timestamp.slice(0, 10) === today);
-
-    const paidCopies = counterTxns.filter(t => t.paymentMode === 'CASH' || t.paymentMode === 'UPI')
-      .reduce((s, t) => s + t.copies, 0);
-
-    const vipCopies = counterTxns.filter(t => t.type === 'VIP' || t.paymentMode === 'FREE_VIP')
-      .reduce((s, t) => s + t.copies, 0);
-
-    const totalSold = paidCopies + vipCopies;
-    const cashTotal = counterTxns.filter(t => t.paymentMode === 'CASH').reduce((s, t) => s + t.totalAmount, 0);
-    const upiTotal = counterTxns.filter(t => t.paymentMode === 'UPI').reduce((s, t) => s + t.totalAmount, 0);
-    const grandRev = cashTotal + upiTotal;
-
-    if (el.posKpiSold) el.posKpiSold.textContent = totalSold;
+    if (el.posKpiSold) el.posKpiSold.textContent = soldCopies;
     if (el.posKpiRevenue) el.posKpiRevenue.textContent = `₹${grandRev.toLocaleString('en-IN')}`;
 
     // Two-Way Stock Dispatch Banner
@@ -1607,10 +1605,9 @@
     });
 
     const event = CS_Store.getEvent(state.eventKey);
-    const today = new Date().toISOString().slice(0, 10);
-    const counterTxns = (event ? event.transactions : [])
-      .filter(t => t.counterId === state.counterId && !t.voided && t.timestamp.slice(0, 10) === today);
-    const expectedCash = counterTxns.filter(t => t.paymentMode === 'CASH').reduce((s, t) => s + t.totalAmount, 0);
+    const metrics = CS_Store.getBalancedLedgerMetrics(state.eventKey, 'ALL');
+    const breakdown = (metrics && metrics.counterBreakdown) ? metrics.counterBreakdown.find(b => b.id === state.counterId) : null;
+    const expectedCash = breakdown ? breakdown.cashCollection : 0;
 
     const expectedCashEl = document.getElementById('recon-expected-cash');
     if (expectedCashEl) expectedCashEl.textContent = `₹${expectedCash.toLocaleString('en-IN')}`;
@@ -1851,6 +1848,8 @@
     const event = CS_Store.getEvent(state.eventKey);
     if (!event) return;
 
+    if (el.headerStaffPill) el.headerStaffPill.textContent = 'Stock';
+
     const keeperLabel = document.getElementById('stockroom-keeper-label');
     if (keeperLabel) {
       keeperLabel.textContent = (event.stockRoom && (event.stockRoom.keeperName || event.stockRoom.keeper)) || 'Vikram Malhotra';
@@ -2076,6 +2075,8 @@
   function renderAdminDashboard() {
     const event = CS_Store.getEvent(state.eventKey);
     if (!event) return;
+
+    if (el.headerStaffPill) el.headerStaffPill.textContent = 'Admin';
 
     // Header info
     document.getElementById('admin-event-name-display').textContent = event.name;
