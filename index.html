@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="format-detection" content="telephone=no">
+  <title>CounterSync — Smart Counters. Seamless Sales.</title>
+  
+  <!-- PWA & Mobile Meta -->
+  <meta name="theme-color" content="#0066FF">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CounterSync">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/png" href="./icons/logo.png">
+  <link rel="apple-touch-icon" href="./icons/logo.png">
+
+  <!-- High-DPI Dual-Engine Typography (Plus Jakarta Sans, Manjari Malayalam, JetBrains Mono) with instant zero-CDN system fallback -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800;900&family=Manjari:wght@400;700&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Bulletproof Standalone CSS -->
+  <link rel="stylesheet" href="./css/style.css?v=8">
+</head>
+<body>
+  <div id="app">
+    <!-- Sticky App Header (Auto-Hides on Gateway Landing) -->
+    <header id="app-header" class="hidden">
+      <div class="header-brand" id="header-brand-click">
+        <img src="./icons/logo.png" alt="CounterSync" class="header-logo-img">
+        <div class="header-brand-info">
+          <div class="header-brand-top">
+            <span class="brand-title">CounterSync</span>
+            <span class="staff-role-pill" id="header-staff-pill">STAFF</span>
+          </div>
+          <div class="header-event-sub" id="header-event-sub">Almuneer 2026</div>
+        </div>
+      </div>
+
+      <!-- Keep hidden compatibility badge for scripts -->
+      <div class="header-event-badge hidden" id="header-context-badge">
+        <span class="status-dot"></span>
+        <span id="header-event-label">CS2026 • Counter 01A</span>
+      </div>
+
+      <div class="header-actions">
+        <!-- Synced Status Pill matching user mockup -->
+        <div class="synced-status-pill" id="header-sync-pill">
+          <span class="green-sync-dot"></span>
+          <span>Synced</span>
+        </div>
+
+        <!-- Inactivity countdown timer -->
+        <div id="idle-timer-display" class="idle-timer-badge hidden" title="Inactivity Auto-Lock Timer">
+          ⏱️ <span id="idle-seconds">3:00</span>
+        </div>
+
+        <!-- Lock button for staff -->
+        <button id="btn-quick-lock" class="icon-btn hidden" title="Lock Screen">
+          🔒
+        </button>
+
+        <!-- Theme toggle (Moon/Sun) -->
+        <button id="btn-theme-toggle" class="header-round-btn" title="Toggle AMOLED Dark / Light Mode">
+          <span id="theme-toggle-icon">🌙</span>
+        </button>
+
+        <!-- Exit Button -->
+        <button id="btn-header-logout" class="header-round-btn btn-exit-box" title="Return to Brand Gateway">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Dynamic View Container -->
+    <main id="main-view">
+      <!-- 1. Brand Gateway Landing Screen -->
+      <section id="view-landing" class="view-landing">
+        <div class="landing-card">
+          <div class="landing-logo">
+            <img src="./icons/logo.png" alt="CounterSync Official Logo" style="width: 112px; height: 112px; border-radius: 26px; box-shadow: 0 0 40px rgba(0, 102, 255, 0.6); display: block; margin: 0 auto;">
+          </div>
+          <h1 class="landing-title">CounterSync</h1>
+          <p class="landing-tagline">Smart Counters. Seamless Sales.</p>
+
+          <!-- Dual Intent Navigation Cards -->
+          <div id="landing-intents" class="dual-intent-grid">
+            <div class="intent-card" id="card-intent-staff" role="button" tabindex="0" onclick="if(window.openJoinEvent) window.openJoinEvent(); else if(window.CounterSyncApp && window.CounterSyncApp.openJoinEvent) window.CounterSyncApp.openJoinEvent();">
+              <div>
+                <div class="intent-icon">🎟️</div>
+                <div class="intent-title">Join Event</div>
+                <div class="intent-desc">For sales counter volunteers and stock room keepers on the festival field.</div>
+              </div>
+              <div class="intent-arrow">Staff Gateway →</div>
+            </div>
+
+            <div class="intent-card" id="card-intent-organizer" role="button" tabindex="0" onclick="if(window.openHostEvent) window.openHostEvent(); else if(window.CounterSyncApp && window.CounterSyncApp.openHostEvent) window.CounterSyncApp.openHostEvent();">
+              <div>
+                <div class="intent-icon">👑</div>
+                <div class="intent-title">Host an Event</div>
+                <div class="intent-desc">For organizers and Super Admins to audit registers, allocate books, and configure counters.</div>
+              </div>
+              <div class="intent-arrow">Master Portal →</div>
+            </div>
+          </div>
+
+          <!-- 1.2 Join Event Workspace (Exact User Mockup Layout) -->
+          <div id="staff-validation-flow" class="join-workspace-card hidden">
+            <!-- Card Header -->
+            <div class="join-card-header">
+              <button id="btn-back-to-intents" class="join-back-btn" title="Back to gateway" onclick="window.CounterSyncApp && window.CounterSyncApp.backToIntents ? window.CounterSyncApp.backToIntents() : null">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="19" y1="12" x2="5" y2="12"></line>
+                  <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+              </button>
+              <h2 class="join-title">Join Event Workspace</h2>
+              <span id="join-step-badge" class="step-badge">Step 1 of 2</span>
+            </div>
+
+            <!-- Step 1: Enter Event Access Key -->
+            <div class="field-group">
+              <label class="field-label" for="input-event-key">ENTER EVENT ACCESS KEY</label>
+              <div class="input-with-action">
+                <input type="text" id="input-event-key" class="access-key-inline" value="" maxlength="8" placeholder="CS2026" autofocus>
+                <button id="btn-validate-key" class="btn-input-verify" type="button">Verify</button>
+              </div>
+              <div class="field-helper">Type the access key given by your event organizer</div>
+            </div>
+
+            <!-- Step 2: Scoped Verified Workflow (Revealed on Valid Key) -->
+            <div id="scoped-counter-picker" class="hidden">
+              <!-- Verified Event Status Card -->
+              <div id="verified-event-banner" class="verified-event-card">
+                <div class="verified-event-left">
+                  <div class="verified-check-circle">✓</div>
+                  <div>
+                    <div id="verified-event-name" class="verified-title">Almuneer 2026</div>
+                    <div id="verified-event-key" class="verified-subtitle">Verified Key: CS2026</div>
+                  </div>
+                </div>
+                <span class="active-pill">ACTIVE</span>
+              </div>
+
+              <!-- Role / Workspace Segment Selector -->
+              <div class="role-segment-grid">
+                <button type="button" class="role-segment-btn active" id="btn-role-counter">
+                  <span class="segment-icon">🏪</span>
+                  <span>Sales Counter</span>
+                </button>
+                <button type="button" class="role-segment-btn" id="btn-role-stockroom">
+                  <span class="segment-icon">🏛️</span>
+                  <span>Stock Room</span>
+                </button>
+              </div>
+
+              <!-- Counter Picker Section (when Sales Counter is selected) -->
+              <div id="section-counter-picker" class="field-group">
+                <label class="field-label" for="select-assigned-counter">SELECT YOUR ASSIGNED COUNTER</label>
+                <div class="select-wrapper">
+                  <select id="select-assigned-counter" class="custom-select-box">
+                    <!-- Dynamically populated: Counter 01A, Counter 01B, etc. -->
+                  </select>
+                  <span class="select-chevron">⌄</span>
+                </div>
+                <div id="assigned-volunteers-label" class="field-helper" style="font-weight: 700; color: var(--text-secondary); margin-top: 6px;">
+                  Assigned: Safwan, Rashid
+                </div>
+              </div>
+
+              <!-- Stock Room Warehouse Info (when Stock Room is selected) -->
+              <div id="section-stockroom-info" class="field-group hidden">
+                <label class="field-label">WAREHOUSE LOGISTICS VAULT</label>
+                <div class="stockroom-preset-box">
+                  <div style="font-weight: 800; font-size: 1rem; color: var(--text-primary); margin-bottom: 2px;">
+                    Central Stock Room & Logistics
+                  </div>
+                  <div id="stockroom-keeper-hint" class="field-helper" style="margin-top: 0;">
+                    Keeper: Vikram Malhotra & Logistics Squad
+                  </div>
+                </div>
+              </div>
+
+              <!-- PIN Input Section -->
+              <div class="field-group">
+                <div class="field-header-row">
+                  <span id="pin-field-label" class="field-label" style="margin-bottom: 0;">COUNTER 01A PIN</span>
+                  <span id="pin-field-hint" class="field-hint" title="Tap to auto-fill PIN">PIN: 1101</span>
+                </div>
+                <input type="password" id="input-counter-pin" class="pin-input-large" placeholder="Enter PIN" maxlength="6" inputmode="numeric">
+              </div>
+
+              <!-- Primary Enter Workspace Button -->
+              <button id="btn-enter-workspace" class="btn-enter-workspace" type="button">
+                <span>Enter Workspace</span>
+                <span>→</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 1.3 Organizer & Super Admin Portal Flow -->
+          <div id="organizer-auth-flow" class="validation-box hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <span class="input-label" style="margin-bottom: 0;">Master Executive Portal</span>
+              <button id="btn-back-from-organizer" class="btn-pill btn-pill-subtle" style="padding: 4px 10px; font-size: 0.75rem;">← Back</button>
+            </div>
+
+            <!-- Google Authentication Flow Hook -->
+            <button id="btn-google-auth" class="btn-pill btn-pill-subtle" style="width: 100%; justify-content: center; height: 50px; font-size: 0.95rem; margin-bottom: 16px; background: #FFFFFF; color: #1F2937; border: 1px solid #E5E7EB; font-weight: 700;">
+              <svg width="20" height="20" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.36 24 12 24z"/>
+                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.17 0 9.99 0 12s.45 3.83 1.25 5.42l4.03-3.15z"/>
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.36 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+              </svg>
+              <span>Continue with Google Sign-In</span>
+            </button>
+
+            <div style="display: flex; align-items: center; gap: 12px; margin: 16px 0; color: var(--text-muted); font-size: 0.8rem; font-weight: 700;">
+              <hr style="flex: 1; border: none; border-top: 1px solid var(--border-subtle);">
+              <span>OR FIELD PIN OVERRIDE</span>
+              <hr style="flex: 1; border: none; border-top: 1px solid var(--border-subtle);">
+            </div>
+
+            <!-- Master PIN Override (9999) -->
+            <div>
+              <label class="input-label" for="input-master-pin">Super Admin Master PIN</label>
+              <input type="password" id="input-master-pin" class="access-key-input" placeholder="••••" maxlength="6" inputmode="numeric">
+              <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 6px;">
+                Field Auditor Master Bypass PIN: <strong style="color: var(--cs-cyan); cursor: pointer;" id="quick-fill-master-pin">9999</strong>
+              </p>
+            </div>
+
+            <button id="btn-login-master" class="btn-complete-sale" style="height: 48px; margin-top: 16px; font-size: 1rem;">
+              Unlock Master Executive Portal →
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Sales Counter Workspace (Exact User Mockup Layout) -->
+      <section id="view-pos" class="hidden pos-workspace-container">
+        <!-- 2.1 Top Counter Summary Card (Pinned at top across all 4 tabs) -->
+        <div class="counter-top-card">
+          <div class="counter-top-header">
+            <div class="counter-name-wrap">
+              <span class="live-dot-green"></span>
+              <span id="pos-counter-name-display" class="counter-title">Counter 01A</span>
+            </div>
+            <div id="pos-volunteers-display" class="counter-volunteers">Volunteers: Safwan, Rashid</div>
+          </div>
+
+          <div class="counter-kpi-trio">
+            <!-- SOLD -->
+            <div class="counter-kpi-col">
+              <div class="counter-kpi-label">SOLD</div>
+              <div class="counter-kpi-value">
+                <span id="pos-kpi-sold" class="kpi-bold-num">0</span>
+                <span class="kpi-unit-text">copies</span>
+              </div>
+            </div>
+
+            <!-- REMAINING (Huge Blue Hero) -->
+            <div class="counter-kpi-col remaining-col" id="hero-stock-box">
+              <div class="counter-kpi-label text-blue">REMAINING</div>
+              <div class="counter-kpi-value text-blue">
+                <span id="hero-stock-count" class="kpi-bold-num text-blue">100</span>
+                <span class="kpi-unit-text text-remaining-sub">COPIES</span>
+              </div>
+            </div>
+
+            <!-- COLLECTION (Bold Green) -->
+            <div class="counter-kpi-col">
+              <div class="counter-kpi-label">COLLECTION</div>
+              <div class="counter-kpi-value text-emerald">
+                <span id="pos-kpi-revenue" class="kpi-bold-num text-emerald">₹0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- In-Transit Dispatch Handshake Notification Banner -->
+        <div id="pos-dispatch-banner" class="dispatch-handshake-banner hidden">
+          <div class="dispatch-text">
+            <h4>📦 Stock In Transit From Central Warehouse!</h4>
+            <p id="pos-dispatch-info">Batch DSP-301 of 50 copies dispatched by Vikram M. Please verify bundles.</p>
+          </div>
+          <button id="btn-accept-dispatch" class="btn-handshake">
+            ✓ Accept Stock (+<span id="pos-dispatch-qty">50</span> Copies)
+          </button>
+        </div>
+
+        <!-- TAB 1: SALE (Image 1) -->
+        <div id="tab-pane-sale" class="dock-content-pane active">
+          <!-- Quantity Row Header -->
+          <div class="dock-section-head">
+            <span class="dock-section-title">SELECT QUANTITY</span>
+            <button type="button" class="btn-vip-free-link" id="btn-open-vip-drawer">
+              <span class="vip-gift-icon">🎁</span>
+              <span>+ VIP / Free Copy</span>
+            </button>
+          </div>
+
+          <!-- 4 Quantity Selectors -->
+          <div class="quick-qty-four-grid">
+            <button type="button" class="btn-qty-card active" data-qty="1">+1</button>
+            <button type="button" class="btn-qty-card" data-qty="2">+2</button>
+            <button type="button" class="btn-qty-card" data-qty="5">+5</button>
+            <button type="button" class="btn-qty-card" data-qty="custom" id="btn-qty-custom-toggle">Custom</button>
+          </div>
+
+          <!-- Custom Quantity Stepper Box (collapsible) -->
+          <div id="panel-custom-qty-stepper" class="custom-stepper-box hidden">
+            <div class="custom-stepper-inner">
+              <button type="button" class="stepper-btn-circle" id="btn-qty-minus">−</button>
+              <input type="number" id="input-billing-qty" class="qty-stepper-input" value="1" min="1" max="500">
+              <button type="button" class="stepper-btn-circle" id="btn-qty-plus">+</button>
+            </div>
+          </div>
+
+          <!-- Payment Mode Section -->
+          <div class="dock-section-head" style="margin-top: 18px;">
+            <span class="dock-section-title">PAYMENT MODE</span>
+          </div>
+
+          <div class="pay-mode-two-grid">
+            <!-- CASH (Active default) -->
+            <button type="button" class="pay-mode-card cash active" id="btn-mode-cash">
+              <div class="pay-icon-tile bg-emerald-light">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+                  <circle cx="12" cy="12" r="2"></circle>
+                  <path d="M6 12h.01M18 12h.01"></path>
+                </svg>
+              </div>
+              <div class="pay-mode-meta">
+                <div class="pay-mode-name">CASH</div>
+                <div class="pay-mode-desc">Physical Cash</div>
+              </div>
+            </button>
+
+            <!-- GPAY / UPI -->
+            <button type="button" class="pay-mode-card upi" id="btn-mode-upi">
+              <div class="pay-icon-tile bg-blue-light">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0066FF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+                  <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+                  <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+                  <path d="M14 14h3v3h-3zM17 17h4v4h-4zM14 21h3"></path>
+                </svg>
+              </div>
+              <div class="pay-mode-meta">
+                <div class="pay-mode-name">GPAY / UPI</div>
+                <div class="pay-mode-desc">Dynamic QR Scan</div>
+              </div>
+            </button>
+          </div>
+
+          <!-- Single Input: Buyer Name / Phone (Optional) -->
+          <div class="buyer-input-container">
+            <input type="text" id="input-buyer-combined" placeholder="Buyer Name / Phone (Optional)" class="buyer-full-input">
+            <!-- Hidden inputs kept for store compatibility -->
+            <input type="hidden" id="input-buyer-name" value="">
+            <input type="hidden" id="input-buyer-phone" value="">
+          </div>
+
+          <!-- Confirm Sale Hero Button -->
+          <button type="button" id="btn-proceed-sale" class="btn-confirm-sale-hero">
+            <span class="check-circle-icon">✓</span>
+            <span id="btn-confirm-sale-label">CONFIRM SALE (1 Copy • ₹100)</span>
+          </button>
+        </div>
+
+        <!-- TAB 2: PRE-ORDERS (Image 2) -->
+        <div id="tab-pane-preorders" class="dock-content-pane hidden">
+          <!-- Search Bar -->
+          <div class="preorder-search-box">
+            <span class="search-glass-icon">🔍</span>
+            <input type="text" id="input-search-preorder" placeholder="Search buyer name, phone, or token ID..." class="preorder-search-input">
+          </div>
+
+          <!-- Pre-Orders Cards Container -->
+          <div id="preorders-list-container" class="preorders-vertical-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- TAB 3: HISTORY (Image 3) -->
+        <div id="tab-pane-history" class="dock-content-pane hidden">
+          <div class="history-list-header">
+            <span class="history-list-title">Recent Counter Transactions</span>
+            <span id="counter-ledger-count" class="history-list-count">0 transactions</span>
+          </div>
+
+          <div id="counter-recent-txns" class="history-cards-container">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- TAB 4: END OF DAY (Image 4) -->
+        <div id="tab-pane-endofday" class="dock-content-pane hidden">
+          <!-- 1. Inter-Counter Stock Transfer Card (Soft Blue Background) -->
+          <div class="eod-transfer-banner">
+            <div class="eod-transfer-info">
+              <div class="eod-transfer-title-row">
+                <span class="eod-transfer-icon">⇆</span>
+                <span class="eod-transfer-heading">Inter-Counter Stock Transfer</span>
+              </div>
+              <div class="eod-transfer-desc">Quickly share books with a neighbouring busy counter</div>
+            </div>
+            <button type="button" class="btn-transfer-blue" id="btn-open-transfer-action">
+              Transfer Copies
+            </button>
+          </div>
+
+          <!-- 2. Cash Reconciliation Calculator Card -->
+          <div class="eod-calc-card">
+            <div class="eod-calc-head">
+              <div class="calc-head-left">
+                <span class="calc-head-icon">🧮</span>
+                <div>
+                  <div class="calc-head-title">Cash Reconciliation Calculator</div>
+                  <div class="calc-head-sub">Count physical currency against logged sales</div>
+                </div>
+              </div>
+              <div class="calc-expected-pill" id="recon-expected-cash-pill">
+                Expected: <span id="recon-expected-cash">₹0</span>
+              </div>
+            </div>
+
+            <!-- 2-Column Denomination Grid (6 boxes) -->
+            <div class="eod-notes-grid">
+              <!-- ₹500 -->
+              <div class="eod-note-box">
+                <div class="note-box-label">
+                  <span class="note-amount">₹500</span>
+                  <span class="note-times">×</span>
+                </div>
+                <input type="number" class="denom-input note-box-input" data-val="500" value="0" min="0" inputmode="numeric">
+              </div>
+
+              <!-- ₹200 -->
+              <div class="eod-note-box">
+                <div class="note-box-label">
+                  <span class="note-amount">₹200</span>
+                  <span class="note-times">×</span>
+                </div>
+                <input type="number" class="denom-input note-box-input" data-val="200" value="0" min="0" inputmode="numeric">
+              </div>
+
+              <!-- ₹100 -->
+              <div class="eod-note-box">
+                <div class="note-box-label">
+                  <span class="note-amount">₹100</span>
+                  <span class="note-times">×</span>
+                </div>
+                <input type="number" class="denom-input note-box-input" data-val="100" value="0" min="0" inputmode="numeric">
+              </div>
+
+              <!-- ₹50 -->
+              <div class="eod-note-box">
+                <div class="note-box-label">
+                  <span class="note-amount">₹50</span>
+                  <span class="note-times">×</span>
+                </div>
+                <input type="number" class="denom-input note-box-input" data-val="50" value="0" min="0" inputmode="numeric">
+              </div>
+
+              <!-- ₹20 -->
+              <div class="eod-note-box">
+                <div class="note-box-label">
+                  <span class="note-amount">₹20</span>
+                  <span class="note-times">×</span>
+                </div>
+                <input type="number" class="denom-input note-box-input" data-val="20" value="0" min="0" inputmode="numeric">
+              </div>
+
+              <!-- ₹10 -->
+              <div class="eod-note-box">
+                <div class="note-box-label">
+                  <span class="note-amount">₹10</span>
+                  <span class="note-times">×</span>
+                </div>
+                <input type="number" class="denom-input note-box-input" data-val="10" value="0" min="0" inputmode="numeric">
+              </div>
+            </div>
+
+            <!-- Reconciliation Summary Bar -->
+            <div class="eod-recon-summary-bar">
+              <div class="summary-col">
+                <div class="summary-col-title">COUNTED PHYSICAL CASH</div>
+                <div class="summary-col-val" id="recon-counted-cash">₹0</div>
+              </div>
+              <div class="summary-col text-right">
+                <div class="summary-col-title">RECONCILIATION STATUS</div>
+                <div class="summary-col-val" id="recon-status-banner">Exact Match ✓</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Bottom Two Action Cards -->
+          <div class="eod-actions-duo">
+            <div class="eod-action-card" id="btn-export-counter-json" role="button" tabindex="0">
+              <div class="action-card-icon-box bg-tint-blue">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0066FF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+              </div>
+              <div>
+                <div class="action-card-text-title">Save Backup</div>
+                <div class="action-card-text-sub">Download .JSON</div>
+              </div>
+            </div>
+
+            <div class="eod-action-card" id="btn-manual-lock" role="button" tabindex="0">
+              <div class="action-card-icon-box bg-tint-amber">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+              </div>
+              <div>
+                <div class="action-card-text-title">Lock Screen</div>
+                <div class="action-card-text-sub">PIN Required</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2.7 Fixed Bottom Navigation Dock (4 Tabs) -->
+        <nav class="pos-bottom-dock" id="pos-bottom-dock">
+          <button type="button" class="dock-tab-btn active" data-pos-tab="sale" id="dock-btn-sale">
+            <span class="dock-tab-icon">⚡</span>
+            <span class="dock-tab-name">Sale</span>
+          </button>
+
+          <button type="button" class="dock-tab-btn" data-pos-tab="preorders" id="dock-btn-preorders">
+            <div class="dock-icon-with-badge">
+              <span class="dock-tab-icon">🏷️</span>
+              <span class="dock-orange-dot" id="preorder-unread-dot"></span>
+            </div>
+            <span class="dock-tab-name">Pre-Orders</span>
+          </button>
+
+          <button type="button" class="dock-tab-btn" data-pos-tab="history" id="dock-btn-history">
+            <span class="dock-tab-icon">🕒</span>
+            <span class="dock-tab-name">History</span>
+          </button>
+
+          <button type="button" class="dock-tab-btn" data-pos-tab="endofday" id="dock-btn-endofday">
+            <span class="dock-tab-icon">🔧</span>
+            <span class="dock-tab-name">End of Day</span>
+          </button>
+        </nav>
+      </section>
+
+      <!-- 3. Central Stock Room & Warehouse Management -->
+      <section id="view-stockroom" class="hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 24px;">
+          <div>
+            <h2 style="font-size: 1.8rem; letter-spacing: -0.03em;">Central Stock Room & Logistics Vault</h2>
+            <p style="font-size: 0.9rem; color: var(--text-secondary);">
+              Managed by <strong id="stockroom-keeper-label" style="color: var(--cs-cyan);">Vikram Malhotra</strong> • Main Physical Warehouse
+            </p>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button id="btn-refresh-stockroom" class="btn-pill btn-pill-subtle">🔄 Refresh Sync</button>
+          </div>
+        </div>
+
+        <!-- 3.1 Central Inventory Dashboard 4 KPIs -->
+        <div class="stockroom-kpi-grid">
+          <div class="kpi-tile" style="border-top: 4px solid var(--cs-electric-blue);">
+            <div class="kpi-tile-title">Total Press Inflow</div>
+            <div id="sr-kpi-inflow" class="kpi-tile-value">2,500</div>
+            <div class="kpi-tile-sub">Print runs delivered from press</div>
+          </div>
+
+          <div class="kpi-tile" style="border-top: 4px solid var(--color-emerald); background: rgba(16, 185, 129, 0.05);">
+            <div class="kpi-tile-title">Remaining Vault Reserve</div>
+            <div id="sr-kpi-reserve" class="kpi-tile-value text-emerald">1,630</div>
+            <div class="kpi-tile-sub">Unallocated physical reserve in store</div>
+          </div>
+
+          <div class="kpi-tile" style="border-top: 4px solid var(--cs-cyan);">
+            <div class="kpi-tile-title">Distributed to Counters</div>
+            <div id="sr-kpi-distributed" class="kpi-tile-value">820</div>
+            <div class="kpi-tile-sub">Supplied across active sales desks</div>
+          </div>
+
+          <div class="kpi-tile" style="border-top: 4px solid var(--color-amber);">
+            <div class="kpi-tile-title">Complimentary Vault Total</div>
+            <div id="sr-kpi-giveaway" class="kpi-tile-value text-amber">50</div>
+            <div class="kpi-tile-sub">Direct vault dignitary issues</div>
+          </div>
+        </div>
+
+        <!-- Warehouse Action Form Cards -->
+        <div class="stock-action-cards">
+          <!-- 3.3 Counter Stock Dispatches -->
+          <div class="stock-action-card">
+            <h3 style="color: var(--cs-electric-blue);">📦 Dispatch Stock to Counter</h3>
+            <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 12px;">
+              Formulate dispatch batch. Remains in transit until counter taps handshake.
+            </p>
+            <div style="margin-bottom: 10px;">
+              <label class="input-label" for="dispatch-target-counter">Select Destination Counter</label>
+              <select id="dispatch-target-counter"></select>
+            </div>
+            <div style="margin-bottom: 14px;">
+              <label class="input-label" for="dispatch-qty">Copies to Dispatch</label>
+              <input type="number" id="dispatch-qty" value="50" min="1" max="1000">
+            </div>
+            <button id="btn-submit-dispatch" class="btn-complete-sale" style="height: 44px; font-size: 0.95rem;">
+              Dispatch Batch →
+            </button>
+          </div>
+
+          <!-- 3.2 Direct Vault Complimentary Issues -->
+          <div class="stock-action-card">
+            <h3 style="color: var(--cs-cyan);">🎖️ Vault Dignitary Giveaway</h3>
+            <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 12px;">
+              Issue complimentary copies straight from warehouse reserve.
+            </p>
+            <div style="margin-bottom: 8px;">
+              <input type="text" id="vault-giveaway-name" placeholder="Recipient Dignitary Name *">
+            </div>
+            <div style="margin-bottom: 8px;">
+              <input type="text" id="vault-giveaway-desig" placeholder="Designation / Guest Role *">
+            </div>
+            <div style="margin-bottom: 14px;">
+              <input type="number" id="vault-giveaway-qty" value="5" min="1" max="50" placeholder="Qty">
+            </div>
+            <button id="btn-submit-vault-giveaway" class="btn-complete-sale" style="height: 44px; font-size: 0.95rem; background: linear-gradient(135deg, #00D2FF, #0066FF);">
+              Log Vault Giveaway
+            </button>
+          </div>
+
+          <!-- 3.4 Press Audit & Stock Correction -->
+          <div class="stock-action-card">
+            <h3 style="color: var(--color-amber);">⚖️ Press Audit & Correction</h3>
+            <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 12px;">
+              Adjust press count for damaged bundles, printing defects, or audit miscounts.
+            </p>
+            <div style="margin-bottom: 8px;">
+              <label class="input-label" for="correction-delta">Adjustment Change (+ / −)</label>
+              <input type="number" id="correction-delta" placeholder="e.g. -20 for damaged bundles">
+            </div>
+            <div style="margin-bottom: 8px;">
+              <label class="input-label" for="correction-reason">Mandatory Reason Code</label>
+              <select id="correction-reason">
+                <option value="Damaged Bundles">Damaged Bundles</option>
+                <option value="Physical Miscount">Physical Miscount</option>
+                <option value="Audit Adjustment">Audit Adjustment</option>
+              </select>
+            </div>
+            <div style="margin-bottom: 14px;">
+              <input type="text" id="correction-notes" placeholder="Detailed audit notes...">
+            </div>
+            <button id="btn-submit-correction" class="btn-complete-sale" style="height: 44px; font-size: 0.95rem; background: linear-gradient(135deg, #F59E0B, #D97706);">
+              Apply Press Correction
+            </button>
+          </div>
+        </div>
+
+        <!-- Active In-Transit Dispatches & Alerts Table -->
+        <div class="data-table-wrapper">
+          <div class="data-table-header">
+            <h3>🚚 Active Dispatches & Counter Handshakes</h3>
+            <span class="stock-pill" id="sr-active-dispatches-count">0 In Transit</span>
+          </div>
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th>Dispatch ID</th>
+                <th>Target Counter</th>
+                <th>Copies</th>
+                <th>Dispatched At</th>
+                <th>Status</th>
+                <th>Acknowledged By</th>
+              </tr>
+            </thead>
+            <tbody id="sr-dispatches-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Counter Low Stock Requests Monitor -->
+        <div class="data-table-wrapper">
+          <div class="data-table-header">
+            <h3 style="color: var(--color-rose);">🚨 Counter Low Stock Alerts</h3>
+            <span class="stock-pill low" id="sr-low-stock-alert-count">0 Alerts</span>
+          </div>
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th>Counter</th>
+                <th>Assigned Volunteers</th>
+                <th>Current Stock</th>
+                <th>Alert Triggered</th>
+                <th>Instant Action</th>
+              </tr>
+            </thead>
+            <tbody id="sr-low-stock-tbody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 4. Super Admin Executive Master Dashboard -->
+      <section id="view-admin" class="hidden">
+        <!-- 4.1 Master Event Access Key Banner -->
+        <div class="master-banner">
+          <div>
+            <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--cs-cyan); font-weight: 800; margin-bottom: 4px;">
+              Master Executive Dashboard • Multi-Tenant Control
+            </div>
+            <h2 id="admin-event-name-display" style="font-size: 1.8rem; letter-spacing: -0.03em;">
+              Bangalore Literary Festival 2026
+            </h2>
+            <p id="admin-event-book-title" style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 2px;">
+              Book: Chronicles of the Silicon Plateau (Hardcover Edition) • Retail ₹250
+            </p>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+            <div class="master-key-badge">
+              <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 700;">EVENT ACCESS KEY:</span>
+              <span id="admin-master-key-code" class="master-key-code">CS2026</span>
+              <button id="btn-copy-access-key" class="btn-copy-key" title="Copy to clipboard">📋 Copy</button>
+            </div>
+            <button id="btn-open-event-settings" class="btn-pill btn-pill-subtle">⚙️ Event Settings</button>
+            <button id="btn-open-counter-mgmt" class="btn-pill btn-pill-primary">➕ Manage Counters</button>
+          </div>
+        </div>
+
+        <!-- 4.2 Multi-Day Date Filter Toolbar -->
+        <div class="filter-toolbar">
+          <div class="date-filter-group">
+            <label class="input-label" style="margin-bottom: 0;">Date Filter:</label>
+            <select id="admin-date-filter" class="date-select">
+              <option value="ALL">All Days (Grand Total)</option>
+              <option value="TODAY">Today Only</option>
+              <!-- Historical dates populated dynamically -->
+            </select>
+          </div>
+
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <button id="btn-export-csv" class="btn-pill btn-pill-primary" style="background: linear-gradient(135deg, #10B981, #059669);">
+              📊 Context-Aware CSV Export
+            </button>
+            <button id="btn-download-json-master" class="btn-pill btn-pill-subtle">
+              📥 Master JSON Backup
+            </button>
+          </div>
+        </div>
+
+        <!-- 4.3 Grand Inventory Summary (Balanced Ledger Matrix - 6 Columns) -->
+        <div class="balanced-matrix-card">
+          <h3>
+            <span>Grand Inventory Summary (Balanced Ledger Matrix)</span>
+            <span style="font-size: 0.8rem; color: var(--color-emerald); font-weight: 700;">
+              ✓ 100% Mathematically Reconciled
+            </span>
+          </h3>
+          <div class="matrix-grid">
+            <div class="matrix-col">
+              <div class="matrix-col-title">1. Total Press Inflow</div>
+              <div id="m-inflow" class="matrix-col-value">2,480</div>
+            </div>
+            <div class="matrix-col">
+              <div class="matrix-col-title">2. Total Copies Sold</div>
+              <div id="m-sold" class="matrix-col-value text-blue">212</div>
+            </div>
+            <div class="matrix-col">
+              <div class="matrix-col-title">3. Total VIP / Complimentary</div>
+              <div id="m-vip" class="matrix-col-value text-amber">18</div>
+            </div>
+            <div class="matrix-col highlight-reserve">
+              <div class="matrix-col-title">4. Reserve In Vault</div>
+              <div id="m-reserve" class="matrix-col-value">1,630</div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 4px;">Staff: <span id="admin-stockroom-keeper-display">Vikram Malhotra</span></div>
+            </div>
+            <div class="matrix-col">
+              <div class="matrix-col-title">5. Active In Counters</div>
+              <div id="m-active" class="matrix-col-value">620</div>
+            </div>
+            <div class="matrix-col highlight-unsold">
+              <div class="matrix-col-title">6. Grand Unsold Balance</div>
+              <div id="m-unsold" class="matrix-col-value text-emerald">2,250</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4.4 Financial KPI Tiles (4 Columns) -->
+        <div class="financial-kpi-grid">
+          <div class="kpi-tile" style="border-left: 4px solid var(--cs-electric-blue);">
+            <div class="kpi-tile-title">Total Gross Revenue</div>
+            <div id="kpi-gross-rev" class="kpi-tile-value text-blue">₹53,000</div>
+            <div class="kpi-tile-sub">Combined Cash + Digital UPI</div>
+          </div>
+
+          <div class="kpi-tile" style="border-left: 4px solid var(--color-emerald);">
+            <div class="kpi-tile-title">Cash In Hand</div>
+            <div id="kpi-cash-total" class="kpi-tile-value text-emerald">₹26,500</div>
+            <div class="kpi-tile-sub">Total physical currency across desks</div>
+          </div>
+
+          <div class="kpi-tile" style="border-left: 4px solid var(--cs-cyan);">
+            <div class="kpi-tile-title">Digital GPay / UPI Total</div>
+            <div id="kpi-upi-total" class="kpi-tile-value" style="color: var(--cs-cyan);">₹26,500</div>
+            <div class="kpi-tile-sub">Verified direct bank transfers</div>
+          </div>
+
+          <div class="kpi-tile" style="border-left: 4px solid var(--color-amber);">
+            <div class="kpi-tile-title">Pre-Order Handover Tracker</div>
+            <div id="kpi-preorder-ratio" class="kpi-tile-value text-amber">1 / 4</div>
+            <div id="kpi-preorder-sub" class="kpi-tile-sub">1 Delivered • 3 Pending</div>
+          </div>
+        </div>
+
+        <!-- 4.5 Live Counter Performance Table -->
+        <div class="data-table-wrapper">
+          <div class="data-table-header">
+            <h3>📈 Live Counter Performance & Collection Audit</h3>
+            <span class="stock-pill" id="admin-counter-count-pill">4 Counters Active</span>
+          </div>
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th>Counter & PIN</th>
+                <th>Assigned Volunteers & UPI ID</th>
+                <th>Stock Supplied</th>
+                <th>Copies Sold</th>
+                <th>Free / VIP</th>
+                <th>Physical Balance</th>
+                <th>Cash Total</th>
+                <th>UPI Total</th>
+                <th>Net Collection</th>
+              </tr>
+            </thead>
+            <tbody id="admin-counters-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Master Transaction Ledger -->
+        <div class="data-table-wrapper">
+          <div class="data-table-header">
+            <h3>📜 Event Master Transactions Register</h3>
+            <div style="display: flex; gap: 10px;">
+              <input type="text" id="admin-search-txns" placeholder="Search transactions..." style="max-width: 260px; height: 36px;">
+            </div>
+          </div>
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th>Txn ID</th>
+                <th>Time</th>
+                <th>Counter</th>
+                <th>Type</th>
+                <th>Copies</th>
+                <th>Total</th>
+                <th>Mode</th>
+                <th>Buyer / Recipient</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="admin-transactions-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- Modals Container -->
+    <!-- 1. Dynamic UPI QR Code Modal -->
+    <div id="modal-upi-qr" class="modal-overlay hidden">
+      <div class="modal-content" style="text-align: center;">
+        <div class="modal-header">
+          <h3>📱 Scan UPI QR Code</h3>
+          <button class="modal-close-btn" data-close-modal="modal-upi-qr">✕</button>
+        </div>
+        <p style="font-size: 0.9rem; color: var(--text-secondary);">
+          Scan with Google Pay, PhonePe, Paytm, or BHIM
+        </p>
+
+        <div class="qr-container">
+          <div id="upi-qr-render-box" class="qr-code-svg-wrap"></div>
+          <div class="upi-app-logos">
+            <span>GPay</span> • <span>PhonePe</span> • <span>Paytm</span> • <span>BHIM</span>
+          </div>
+        </div>
+
+        <div class="total-due" id="qr-modal-amount" style="margin-bottom: 8px;">₹250</div>
+        <div class="upi-id-pill" id="qr-modal-upi-id">cs.counter01a@okhdfcbank</div>
+
+        <div style="display: flex; gap: 10px; margin-top: 16px;">
+          <button id="btn-copy-upi-link" class="btn-pill btn-pill-subtle" style="flex: 1; justify-content: center;">
+            📋 Copy UPI URI
+          </button>
+          <button id="btn-confirm-upi-paid" class="btn-complete-sale" style="flex: 1; height: 46px; font-size: 0.95rem;">
+            ✓ Payment Received
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Fast Sale Confirmation Dialog (Double-tap prevention during festival rush) -->
+    <div id="modal-confirm-sale" class="modal-overlay hidden">
+      <div class="modal-content" style="max-width: 420px; text-align: center;">
+        <div style="font-size: 3rem; margin-bottom: 12px;">⚡</div>
+        <h3 style="font-size: 1.4rem; margin-bottom: 6px;">Confirm Rush Sale</h3>
+        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 20px;">
+          Please verify order details before debiting physical stock.
+        </p>
+
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 18px; margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: var(--text-secondary);">Quantity:</span>
+            <strong id="confirm-modal-qty" style="font-size: 1.1rem;">1 Copy</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: var(--text-secondary);">Payment Mode:</span>
+            <strong id="confirm-modal-mode" style="color: var(--color-emerald); font-size: 1.1rem;">CASH</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: var(--text-secondary);">Total Bill:</span>
+            <strong id="confirm-modal-total" style="font-size: 1.4rem; color: var(--text-primary);">₹250</strong>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <button class="btn-pill btn-pill-subtle" data-close-modal="modal-confirm-sale" style="justify-content: center; height: 50px;">
+            Cancel
+          </button>
+          <button id="btn-finalize-sale-confirmed" class="btn-complete-sale" style="height: 50px; font-size: 1.05rem;">
+            Confirm & Log ✓
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIP / Free Copy Handover Modal (In-App Pop-up) -->
+    <div id="modal-vip-handover" class="modal-overlay hidden">
+      <div class="modal-content" style="max-width: 440px;">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.4rem;">🎁</span>
+            <h3 style="color: #9333EA; font-weight: 800; margin: 0;">VIP / Free Copy Handover</h3>
+          </div>
+          <button class="modal-close-btn" data-close-modal="modal-vip-handover">✕</button>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;">
+          Zero-rupee official issue (₹0). Deducts copies from physical shelf stock with mandatory recipient logging.
+        </p>
+
+        <!-- 1. Number of Free Copies (Plus/Minus Stepper) -->
+        <div style="margin-bottom: 16px;">
+          <label class="input-label">Number of Free Copies *</label>
+          <div class="vip-stepper-row">
+            <button type="button" id="btn-vip-qty-minus" class="stepper-circle-btn">−</button>
+            <input type="number" id="input-vip-qty" class="vip-qty-input font-mono" value="1" min="1" max="999" readonly>
+            <button type="button" id="btn-vip-qty-plus" class="stepper-circle-btn">+</button>
+            <span id="vip-stock-hint" style="font-size: 0.82rem; color: var(--text-muted); margin-left: 8px; font-weight: 700;">(Available: 100)</span>
+          </div>
+        </div>
+
+        <!-- 2. Recipient / Dignitary Name -->
+        <div style="margin-bottom: 14px;">
+          <label class="input-label" for="input-vip-recipient">Recipient / Dignitary Name *</label>
+          <input type="text" id="input-vip-recipient" placeholder="e.g. Chief Guest, Speaker, Sponsor, Press" autofocus>
+        </div>
+
+        <!-- 3. Taken By / Volunteer Name -->
+        <div style="margin-bottom: 20px;">
+          <label class="input-label" for="input-vip-volunteer">Name of Person Taking Items (Volunteer / Staff) *</label>
+          <input type="text" id="input-vip-volunteer" placeholder="e.g. Safwan (Counter Volunteer)">
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 10px;">
+          <button type="button" class="btn-pill btn-pill-subtle" data-close-modal="modal-vip-handover" style="height: 48px; font-weight: 700;">
+            Cancel
+          </button>
+          <button type="button" id="btn-confirm-vip-ok" class="btn-confirm-vip press-effect" style="height: 48px; background: #9333EA; color: #FFFFFF; font-weight: 800; font-size: 1rem; border-radius: 14px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <span>✓ OK</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Simplified PIN-Protected Transaction Cancellation Dialog -->
+    <div id="modal-void-txn" class="modal-overlay hidden">
+      <div class="modal-content" style="max-width: 390px; text-align: center;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h3 style="color: var(--color-rose); font-size: 1.15rem; font-weight: 800; margin: 0;">↺ Cancel Transaction</h3>
+          <button class="modal-close-btn" data-close-modal="modal-void-txn" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-muted);">✕</button>
+        </div>
+
+        <p id="void-txn-summary" style="font-size: 0.92rem; color: var(--text-secondary); margin-bottom: 16px; background: rgba(239, 68, 68, 0.08); padding: 12px 14px; border-radius: 12px; border: 1px dashed rgba(239, 68, 68, 0.3); font-weight: 600;">
+          Cancel 1 copy (₹100) for Direct Buyer?
+        </p>
+
+        <!-- Hidden inputs preserving transaction metadata -->
+        <input type="hidden" id="void-txn-id" value="">
+        <input type="hidden" id="void-reason" value="Counter Staff Cancellation">
+
+        <!-- Single clean input: Counter PIN -->
+        <div style="margin-bottom: 20px; text-align: left;">
+          <label class="input-label" for="void-pin" style="text-align: center; display: block; margin-bottom: 8px; font-weight: 800;">ENTER COUNTER PIN</label>
+          <input type="password" id="void-pin" class="pin-input-large font-mono" placeholder="••••" maxlength="6" inputmode="numeric" style="height: 54px; font-size: 1.5rem; letter-spacing: 0.25em; text-align: center;" autofocus>
+          <div id="void-pin-hint" style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-top: 6px;">Enter Counter PIN (e.g. 1101) to confirm</div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <button type="button" class="btn-pill btn-pill-subtle" data-close-modal="modal-void-txn" style="height: 48px; font-weight: 700;">
+            Keep Sale
+          </button>
+          <button id="btn-submit-void" class="btn-pill press-effect" style="background: var(--color-rose); color: #FFFFFF; height: 48px; font-weight: 800; font-size: 0.95rem; border-radius: 14px; border: none; cursor: pointer;">
+            Cancel Sale
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Counter Management Modal (Admin) -->
+    <div id="modal-counter-mgmt" class="modal-overlay hidden">
+      <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+          <h3>Manage Sales Counters</h3>
+          <button class="modal-close-btn" data-close-modal="modal-counter-mgmt">✕</button>
+        </div>
+
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 18px; margin-bottom: 20px;">
+          <h4 style="font-size: 1rem; margin-bottom: 12px;">Add / Edit Counter</h4>
+          <input type="hidden" id="edit-counter-id">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+            <div>
+              <label class="input-label">Counter Name</label>
+              <input type="text" id="mgmt-counter-name" placeholder="Counter 03 (North Pavilion)">
+            </div>
+            <div>
+              <label class="input-label">Counter PIN (4 digits)</label>
+              <input type="text" id="mgmt-counter-pin" placeholder="1301" maxlength="4">
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+            <div>
+              <label class="input-label">Assigned Volunteers</label>
+              <input type="text" id="mgmt-counter-volunteers" placeholder="Kiran & Deepa">
+            </div>
+            <div>
+              <label class="input-label">Counter UPI Address</label>
+              <input type="text" id="mgmt-counter-upi" placeholder="counter3@upi">
+            </div>
+          </div>
+          <div style="margin-bottom: 14px;">
+            <label class="input-label">Initial Stock Allocation (from vault reserve)</label>
+            <input type="number" id="mgmt-counter-stock" value="50" min="0">
+          </div>
+          <button id="btn-save-counter-mgmt" class="btn-complete-sale" style="height: 44px; font-size: 0.95rem;">
+            Save Counter Configuration
+          </button>
+        </div>
+
+        <div id="mgmt-counter-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 260px; overflow-y: auto;">
+          <!-- Dynamically listed -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Event Master Settings Modal (Admin) -->
+    <div id="modal-event-settings" class="modal-overlay hidden">
+      <div class="modal-content" style="max-width: 520px;">
+        <div class="modal-header">
+          <h3>Master Event Settings</h3>
+          <button class="modal-close-btn" data-close-modal="modal-event-settings">✕</button>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <label class="input-label">Festival / Event Name</label>
+          <input type="text" id="set-event-name">
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <label class="input-label">Book / Publication Title</label>
+          <input type="text" id="set-book-title">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+          <div>
+            <label class="input-label">Single-Copy Price (₹)</label>
+            <input type="number" id="set-unit-price" min="1">
+          </div>
+          <div>
+            <label class="input-label">Event Access Key</label>
+            <input type="text" id="set-event-key" readonly style="font-weight: 800; color: var(--cs-cyan);">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+          <div>
+            <label class="input-label">Super Admin PIN</label>
+            <input type="password" id="set-admin-pin" maxlength="6">
+          </div>
+          <div>
+            <label class="input-label">Stock Room PIN</label>
+            <input type="password" id="set-stock-pin" maxlength="6">
+          </div>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <label class="input-label" for="set-stock-keeper">Stock Room Staff / Assigned Keeper</label>
+          <input type="text" id="set-stock-keeper" placeholder="e.g. Vikram Malhotra & Logistics Squad">
+        </div>
+
+        <button id="btn-save-event-settings" class="btn-complete-sale" style="height: 48px; font-size: 1rem;">
+          Save Master Settings ✓
+        </button>
+      </div>
+    </div>
+
+    <!-- 6. Google Sign-In Simulation Modal -->
+    <div id="modal-google-auth" class="modal-overlay hidden">
+      <div class="modal-content" style="max-width: 400px; text-align: center;">
+        <svg width="44" height="44" viewBox="0 0 24 24" style="margin-bottom: 12px;">
+          <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+          <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.36 24 12 24z"/>
+          <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.17 0 9.99 0 12s.45 3.83 1.25 5.42l4.03-3.15z"/>
+          <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.36 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+        </svg>
+        <h3 style="margin-bottom: 6px;">Sign in with Google</h3>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px;">
+          CounterSync Multi-Tenant SaaS Authorization Hook
+        </p>
+
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px; display: flex; align-items: center; gap: 12px; margin-bottom: 20px; text-align: left; cursor: pointer;" id="google-profile-select">
+          <div style="width: 40px; height: 40px; border-radius: 50%; background: #0066FF; color: white; display: flex; align-items: center; justify-content: center; font-weight: 800;">
+            SA
+          </div>
+          <div style="flex: 1;">
+            <div style="font-weight: 700; font-size: 0.95rem;">Safwan (Festival Director)</div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary);">safwan.organizer@countersync.io</div>
+          </div>
+          <span style="color: var(--color-emerald); font-weight: 700;">✓</span>
+        </div>
+
+        <button id="btn-confirm-google-login" class="btn-complete-sale" style="height: 48px; font-size: 1rem;">
+          Authorize as Super Admin
+        </button>
+      </div>
+    </div>
+
+    <!-- 7. Fullscreen Inactivity Lockout Overlay -->
+    <div id="lockout-screen" class="lockout-overlay hidden">
+      <div class="lockout-box">
+        <div class="lock-icon-wrap">🔒</div>
+        <h2 id="lockout-title" style="font-size: 1.6rem; margin-bottom: 6px;">Workspace Locked</h2>
+        <p id="lockout-desc" style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 24px;">
+          Workspace paused due to inactivity. Enter the assigned PIN to resume.
+        </p>
+
+        <div style="margin-bottom: 18px;">
+          <input type="password" id="input-unlock-pin" class="access-key-input" placeholder="••••" maxlength="6" inputmode="numeric" autofocus>
+          <div id="lockout-pin-hint" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 6px;"></div>
+        </div>
+
+        <button id="btn-submit-unlock" class="btn-complete-sale" style="height: 50px;">
+          Unlock Workspace Desk
+        </button>
+      </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container"></div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="./js/qrcode.js?v=8"></script>
+  <script src="./js/seed.js?v=8"></script>
+  <script src="./js/store.js?v=8"></script>
+  <script src="./js/app.js?v=8"></script>
+</body>
+</html>
