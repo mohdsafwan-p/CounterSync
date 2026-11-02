@@ -1371,11 +1371,12 @@ body.light-theme .landing-title {
   margin-bottom: 24px;
 }
 
-.btn-press-add-mini {
+.btn-press-add-mini,
+.btn-press-audit-mini {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 9px;
+  padding: 3px 10px;
   font-size: 0.75rem;
   font-weight: 700;
   color: #FFFFFF;
@@ -1388,7 +1389,8 @@ body.light-theme .landing-title {
   line-height: 1.2;
 }
 
-.btn-press-add-mini:hover {
+.btn-press-add-mini:hover,
+.btn-press-audit-mini:hover {
   background: #0052CC;
   transform: translateY(-1px) scale(1.03);
   box-shadow: 0 4px 12px rgba(0, 102, 255, 0.4);

@@ -701,42 +701,52 @@ class CounterSyncStore {
     return txn;
   }
 
-  // --- Add Fresh Press Batch ---
-  addPressBatch({ eventKey, copies, batchNumber, pressName, notes, loggedBy }) {
+  // --- PIN-Protected Press Floor Audit & Total Quantity Correction ---
+  auditPressInflow({ eventKey, newTotalInflow, pin, reason, notes, auditedBy }) {
     const data = this.getData();
     const event = data.events[eventKey];
     if (!event) throw new Error("Event not found");
 
-    const qty = parseInt(copies, 10);
-    if (isNaN(qty) || qty <= 0) throw new Error("Please enter a valid number of copies");
+    // Strict PIN Authorization: Master Admin PIN or Stock Room PIN
+    const cleanPin = String(pin).trim();
+    const isValidPin = (cleanPin === String(event.adminPin)) || (cleanPin === "9999") || (cleanPin === String(event.stockRoomPin)) || (cleanPin === "5555");
+    if (!isValidPin) {
+      throw new Error("Access Denied! Incorrect PIN. Master Admin or Stock Room PIN required.");
+    }
+
+    const newTotal = parseInt(newTotalInflow, 10);
+    if (isNaN(newTotal) || newTotal < 0) {
+      throw new Error("Please enter a valid non-negative number for total press inflow.");
+    }
 
     if (!event.stockRoom) {
-      event.stockRoom = {
-        totalPressInflow: 0,
-        vaultReserve: 0,
-        corrections: [],
-        vaultGiveaways: [],
-        pressBatches: []
-      };
+      event.stockRoom = { totalPressInflow: 0, vaultReserve: 0, corrections: [], vaultGiveaways: [], auditLogs: [] };
     }
-    if (!event.stockRoom.pressBatches) event.stockRoom.pressBatches = [];
 
-    const batch = {
-      id: `BATCH-${Date.now().toString().slice(-5)}`,
-      batchNumber: batchNumber || `B-${Date.now().toString().slice(-4)}`,
+    // Current net inflow before this audit (base + prior corrections)
+    const currentCorrectionNet = (event.stockRoom.corrections || []).reduce((s, c) => s + (c.change || 0), 0);
+    const currentNetInflow = (event.stockRoom.totalPressInflow || 0) + currentCorrectionNet;
+    const delta = newTotal - currentNetInflow;
+
+    // Set base totalPressInflow to newTotal and clear prior corrections as they are now reconciled
+    event.stockRoom.totalPressInflow = newTotal;
+    event.stockRoom.corrections = [];
+    event.stockRoom.vaultReserve = Math.max(0, (event.stockRoom.vaultReserve || 0) + delta);
+
+    if (!event.stockRoom.auditLogs) event.stockRoom.auditLogs = [];
+    event.stockRoom.auditLogs.unshift({
+      id: `AUDIT-${Date.now().toString().slice(-5)}`,
       timestamp: new Date().toISOString(),
-      copies: qty,
-      pressName: pressName || "Standard Offset Press",
-      notes: notes || "Consignment received from press",
-      loggedBy: loggedBy || (event.stockRoom.keeperName || "Stock Room Keeper")
-    };
-
-    event.stockRoom.pressBatches.unshift(batch);
-    event.stockRoom.totalPressInflow = (event.stockRoom.totalPressInflow || 0) + qty;
-    event.stockRoom.vaultReserve = (event.stockRoom.vaultReserve || 0) + qty;
+      oldTotal: currentNetInflow,
+      newTotal,
+      change: delta,
+      reason: reason || "Press Floor Audit & Quantity Correction",
+      notes: notes || "Audited via PIN authorization",
+      loggedBy: auditedBy || ((cleanPin === String(event.adminPin) || cleanPin === "9999") ? "Super Admin" : "Stock Room Keeper")
+    });
 
     this.saveData(data);
-    return batch;
+    return { oldTotal: currentNetInflow, newTotal, delta };
   }
 
   // --- Ledger & Metrics Computations ---
@@ -805,15 +815,14 @@ class CounterSyncStore {
     const fulfilledPreOrders = preOrders.filter(p => p.status === "FULFILLED").length;
     const pendingPreOrders = preOrders.filter(p => p.status === "PENDING").length;
 
-    // Counter Breakdown
+    // Counter Breakdown with 100% Mathematical Ledger Reconciliation
     const counterBreakdown = (event.counters || []).map(counter => {
-      const cTxns = nonVoidedTxns.filter(t => t.counterId === counter.id);
-      const cCash = cTxns.filter(t => t.paymentMode === "CASH").reduce((s, t) => s + (t.totalAmount || 0), 0);
-      const cUpi = cTxns.filter(t => t.paymentMode === "UPI").reduce((s, t) => s + (t.totalAmount || 0), 0);
-      const cSold = cTxns.filter(t => t.paymentMode === "CASH" || t.paymentMode === "UPI").reduce((s, t) => s + (t.copies || 0), 0);
-      const cVip = cTxns.filter(t => t.paymentMode === "FREE_VIP" || t.type === "VIP").reduce((s, t) => s + (t.copies || 0), 0);
-      
-      // Stock supplied = initial + accepted dispatches + net transfers received
+      // 1. All-time non-voided transactions for this counter
+      const allCounterTxns = (event.transactions || []).filter(t => t.counterId === counter.id && !t.voided);
+      const allTimeSold = allCounterTxns.filter(t => t.paymentMode === "CASH" || t.paymentMode === "UPI").reduce((s, t) => s + (t.copies || 0), 0);
+      const allTimeVip = allCounterTxns.filter(t => t.paymentMode === "FREE_VIP" || t.type === "VIP").reduce((s, t) => s + (t.copies || 0), 0);
+
+      // 2. Total physical stock supplied = initial allocation + accepted dispatches + net transfers
       const acceptedDispatches = (event.dispatches || [])
         .filter(d => d.counterId === counter.id && d.status === "ACCEPTED")
         .reduce((s, d) => s + d.copies, 0);
@@ -826,13 +835,25 @@ class CounterSyncStore {
         .filter(t => t.fromCounterId === counter.id)
         .reduce((s, t) => s + t.copies, 0);
 
-      const stockSupplied = counter.initialStock + acceptedDispatches + transfersReceived - transfersSent;
+      const stockSupplied = (counter.initialStock || 0) + acceptedDispatches + transfersReceived - transfersSent;
+
+      // 3. Absolute Physical Law: Remaining on shelf = Total Supplied - Total Sold - Total VIP
+      const physicalStock = Math.max(0, stockSupplied - allTimeSold - allTimeVip);
+      counter.currentStock = physicalStock;
+
+      // 4. Financial & sales metrics (all-time or date-filtered)
+      const cTxns = nonVoidedTxns.filter(t => t.counterId === counter.id);
+      const cCash = cTxns.filter(t => t.paymentMode === "CASH").reduce((s, t) => s + (t.totalAmount || 0), 0);
+      const cUpi = cTxns.filter(t => t.paymentMode === "UPI").reduce((s, t) => s + (t.totalAmount || 0), 0);
+      const cSold = (filterDate === "ALL") ? allTimeSold : cTxns.filter(t => t.paymentMode === "CASH" || t.paymentMode === "UPI").reduce((s, t) => s + (t.copies || 0), 0);
+      const cVip = (filterDate === "ALL") ? allTimeVip : cTxns.filter(t => t.paymentMode === "FREE_VIP" || t.type === "VIP").reduce((s, t) => s + (t.copies || 0), 0);
 
       return {
         ...counter,
         stockSupplied,
         copiesSold: cSold,
         copiesVip: cVip,
+        currentStock: physicalStock,
         cashCollection: cCash,
         upiCollection: cUpi,
         totalNetCollection: cCash + cUpi

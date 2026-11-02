@@ -1768,75 +1768,80 @@
       }
     });
 
-    // 3.5 Add Press Batch to Vault Modal triggers
-    const btnOpenPress = document.getElementById('btn-open-add-press-batch');
-    if (btnOpenPress) {
-      btnOpenPress.addEventListener('click', () => {
+    // 3.5 PIN-Protected Press Floor Audit Modal triggers
+    const btnOpenPressAudit = document.getElementById('btn-open-audit-press');
+    if (btnOpenPressAudit) {
+      btnOpenPressAudit.addEventListener('click', () => {
         const event = CS_Store.getEvent(state.eventKey);
-        const batches = (event && event.stockRoom && event.stockRoom.pressBatches) || [];
-        const nextNum = (batches.length + 1).toString().padStart(2, '0');
-        const batchNumInput = document.getElementById('press-batch-number');
-        if (batchNumInput) batchNumInput.value = `BATCH-${nextNum}`;
-        const qtyInput = document.getElementById('press-batch-qty');
-        if (qtyInput) qtyInput.value = '500';
-        const sourceInput = document.getElementById('press-batch-source');
-        if (sourceInput) sourceInput.value = '';
-        const notesInput = document.getElementById('press-batch-notes');
+        const currentInflow = (event && event.stockRoom && event.stockRoom.totalPressInflow) || 0;
+        const currentQtyDisplay = document.getElementById('audit-press-current-qty');
+        if (currentQtyDisplay) currentQtyDisplay.textContent = `${currentInflow.toLocaleString('en-IN')} copies`;
+        const newQtyInput = document.getElementById('audit-press-new-qty');
+        if (newQtyInput) newQtyInput.value = currentInflow;
+        const notesInput = document.getElementById('audit-press-notes');
         if (notesInput) notesInput.value = '';
+        const pinInput = document.getElementById('audit-press-pin');
+        if (pinInput) pinInput.value = '';
 
-        const modal = document.getElementById('modal-add-press-batch');
+        const modal = document.getElementById('modal-audit-press');
         if (modal) {
           modal.classList.remove('hidden');
-          if (qtyInput) setTimeout(() => qtyInput.focus(), 60);
+          if (newQtyInput) setTimeout(() => newQtyInput.focus(), 60);
         }
       });
     }
 
-    // Quick quantity preset pills for press batch
-    document.querySelectorAll('.btn-press-preset').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const qty = e.target.dataset.qty;
-        const qtyInput = document.getElementById('press-batch-qty');
-        if (qtyInput && qty) {
-          qtyInput.value = qty;
+    // Submit Press Audit Correction
+    const btnSubmitPressAudit = document.getElementById('btn-submit-press-audit');
+    if (btnSubmitPressAudit) {
+      btnSubmitPressAudit.addEventListener('click', () => {
+        const newQtyInput = document.getElementById('audit-press-new-qty');
+        const reasonSelect = document.getElementById('audit-press-reason');
+        const notesInput = document.getElementById('audit-press-notes');
+        const pinInput = document.getElementById('audit-press-pin');
+
+        const newQty = parseInt(newQtyInput ? newQtyInput.value : '0', 10);
+        const reason = reasonSelect ? reasonSelect.value : 'Press Floor Audit & Quantity Correction';
+        const notes = notesInput ? notesInput.value.trim() : '';
+        const pin = pinInput ? pinInput.value.trim() : '';
+
+        if (isNaN(newQty) || newQty < 0) {
+          showToast('Please enter a valid non-negative number of copies', 'error');
+          if (newQtyInput) newQtyInput.focus();
+          return;
         }
-      });
-    });
 
-    // Submit Press Batch
-    const btnSubmitPress = document.getElementById('btn-submit-press-batch');
-    if (btnSubmitPress) {
-      btnSubmitPress.addEventListener('click', () => {
-        const qty = parseInt(document.getElementById('press-batch-qty').value, 10);
-        const batchNumber = document.getElementById('press-batch-number').value.trim();
-        const pressName = document.getElementById('press-batch-source').value.trim();
-        const notes = document.getElementById('press-batch-notes').value.trim();
-
-        if (isNaN(qty) || qty <= 0) {
-          showToast('Please enter a valid number of copies (> 0)', 'error');
+        if (!pin) {
+          showToast('PIN authorization required to modify press total quantity', 'error');
+          if (pinInput) pinInput.focus();
           return;
         }
 
         try {
-          const batch = CS_Store.addPressBatch({
+          const result = CS_Store.auditPressInflow({
             eventKey: state.eventKey,
-            copies: qty,
-            batchNumber,
-            pressName,
+            newTotalInflow: newQty,
+            pin,
+            reason,
             notes,
-            loggedBy: 'Central Stock Room Keeper'
+            auditedBy: state.role === 'admin' ? 'Super Admin' : (state.stockRoomKeeperName || 'Stock Room Keeper')
           });
 
-          const modal = document.getElementById('modal-add-press-batch');
+          const modal = document.getElementById('modal-audit-press');
           if (modal) modal.classList.add('hidden');
 
           CS_Audio.handshakeSuccess();
-          showToast(`✓ Received +${qty.toLocaleString('en-IN')} copies (${batch.batchNumber}) into Vault!`, 'success');
+          const deltaSign = result.delta >= 0 ? `+${result.delta}` : `${result.delta}`;
+          showToast(`✓ Press Inflow audited: ${result.newTotal.toLocaleString('en-IN')} copies (${deltaSign})!`, 'success');
           renderStockRoomWorkspace();
           if (state.currentView === 'admin') renderAdminDashboard();
         } catch (err) {
           CS_Audio.alertWarning();
           showToast(err.message, 'error');
+          if (pinInput) {
+            pinInput.value = '';
+            pinInput.focus();
+          }
         }
       });
     }

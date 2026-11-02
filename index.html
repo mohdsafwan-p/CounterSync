@@ -22,7 +22,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800;900&family=Manjari:wght@400;700&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- Bulletproof Standalone CSS -->
-  <link rel="stylesheet" href="./css/style.css?v=9">
+  <link rel="stylesheet" href="./css/style.css?v=11">
 </head>
 <body>
   <div id="app">
@@ -581,9 +581,8 @@
           <div class="kpi-tile" style="border-top: 4px solid var(--cs-electric-blue);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
               <div class="kpi-tile-title" style="margin-bottom: 0;">Total Press Inflow</div>
-              <button id="btn-open-add-press-batch" type="button" class="btn-press-add-mini" title="Add fresh batch of books arriving from press">
-                <span style="font-size: 1.05rem; line-height: 1; font-weight: 800;">+</span>
-                <span>Add Batch</span>
+              <button id="btn-open-audit-press" type="button" class="btn-press-audit-mini" title="Audit and correct press inflow quantity (PIN required)">
+                <span>⚖️ Audit</span>
               </button>
             </div>
             <div id="sr-kpi-inflow" class="kpi-tile-value">2,500</div>
@@ -609,39 +608,7 @@
           </div>
         </div>
 
-        <!-- 3.2 Individual Counters Live Stock Status Monitor -->
-        <div class="data-table-wrapper" style="margin-bottom: 24px;">
-          <div class="data-table-header">
-            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-              <h3 style="display: flex; align-items: center; gap: 8px;">
-                <span>🏪 Individual Counters Stock Status</span>
-              </h3>
-              <span class="stock-pill" id="sr-active-counters-pill">4 Counters Active</span>
-            </div>
-            <div style="font-size: 0.82rem; color: var(--text-secondary);">
-              Field Total: <strong id="sr-total-field-copies" style="color: var(--cs-cyan); font-weight: 800;">0</strong> copies across counters
-            </div>
-          </div>
-          <table class="cs-table">
-            <thead>
-              <tr>
-                <th>Counter Name</th>
-                <th>Volunteers</th>
-                <th>Shelf Stock</th>
-                <th>Status</th>
-                <th>Supplied</th>
-                <th>Sold</th>
-                <th>In Transit</th>
-                <th>Quick Action</th>
-              </tr>
-            </thead>
-            <tbody id="sr-counters-stock-tbody">
-              <!-- Dynamically populated from event.counters & metrics -->
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Warehouse Action Form Cards -->
+        <!-- Warehouse Action Form Cards (The 3 Action Cards) -->
         <div class="stock-action-cards">
           <!-- 3.3 Counter Stock Dispatches -->
           <div class="stock-action-card">
@@ -709,8 +676,30 @@
           </div>
         </div>
 
-        <!-- Active In-Transit Dispatches & Alerts Table -->
-        <div class="data-table-wrapper">
+        <!-- 3rd From Bottom: Counter Low Stock Requests Monitor -->
+        <div class="data-table-wrapper" style="margin-bottom: 24px;">
+          <div class="data-table-header">
+            <h3 style="color: var(--color-rose);">🚨 Counter Low Stock Alerts</h3>
+            <span class="stock-pill low" id="sr-low-stock-alert-count">0 Alerts</span>
+          </div>
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th>Counter</th>
+                <th>Assigned Volunteers</th>
+                <th>Current Stock</th>
+                <th>Alert Triggered</th>
+                <th>Instant Action</th>
+              </tr>
+            </thead>
+            <tbody id="sr-low-stock-tbody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 2nd From Bottom: Active In-Transit Dispatches & Alerts Table -->
+        <div class="data-table-wrapper" style="margin-bottom: 24px;">
           <div class="data-table-header">
             <h3>🚚 Active Dispatches & Counter Handshakes</h3>
             <span class="stock-pill" id="sr-active-dispatches-count">0 In Transit</span>
@@ -732,24 +721,34 @@
           </table>
         </div>
 
-        <!-- Counter Low Stock Requests Monitor -->
-        <div class="data-table-wrapper">
+        <!-- 1st From Bottom (At the bottom, below the other three): Individual Counters Live Stock Status Monitor -->
+        <div class="data-table-wrapper" style="margin-bottom: 24px;">
           <div class="data-table-header">
-            <h3 style="color: var(--color-rose);">🚨 Counter Low Stock Alerts</h3>
-            <span class="stock-pill low" id="sr-low-stock-alert-count">0 Alerts</span>
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <h3 style="display: flex; align-items: center; gap: 8px;">
+                <span>🏪 Individual Counters Stock Status</span>
+              </h3>
+              <span class="stock-pill" id="sr-active-counters-pill">4 Counters Active</span>
+            </div>
+            <div style="font-size: 0.82rem; color: var(--text-secondary);">
+              Field Total: <strong id="sr-total-field-copies" style="color: var(--cs-cyan); font-weight: 800;">0</strong> copies across counters
+            </div>
           </div>
           <table class="cs-table">
             <thead>
               <tr>
-                <th>Counter</th>
-                <th>Assigned Volunteers</th>
-                <th>Current Stock</th>
-                <th>Alert Triggered</th>
-                <th>Instant Action</th>
+                <th>Counter Name</th>
+                <th>Volunteers</th>
+                <th>Shelf Stock</th>
+                <th>Status</th>
+                <th>Supplied</th>
+                <th>Sold</th>
+                <th>In Transit</th>
+                <th>Quick Action</th>
               </tr>
             </thead>
-            <tbody id="sr-low-stock-tbody">
-              <!-- Populated dynamically -->
+            <tbody id="sr-counters-stock-tbody">
+              <!-- Dynamically populated from event.counters & metrics -->
             </tbody>
           </table>
         </div>
@@ -1172,45 +1171,49 @@
       </div>
     </div>
 
-    <!-- 5.5 Add Press Batch to Stock Room Modal -->
-    <div id="modal-add-press-batch" class="modal-overlay hidden">
+    <!-- 5.5 PIN-Protected Press Floor Audit Modal -->
+    <div id="modal-audit-press" class="modal-overlay hidden">
       <div class="modal-content" style="max-width: 440px;">
         <div class="modal-header">
-          <h3 style="color: var(--cs-electric-blue);">📦 Add Press Batch to Vault</h3>
-          <button class="modal-close-btn" data-close-modal="modal-add-press-batch" id="btn-close-press-batch">✕</button>
+          <h3 style="color: var(--cs-electric-blue);">⚖️ Audit Press Floor Total Quantity</h3>
+          <button class="modal-close-btn" data-close-modal="modal-audit-press" id="btn-close-audit-press">✕</button>
         </div>
         <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 16px;">
-          Log fresh physical print runs arriving at the Central Stock Room. Automatically increments Total Press Inflow and Vault Reserve.
+          PIN-protected correction. Reconcile total physical print runs delivered from press.
         </p>
 
-        <div style="margin-bottom: 12px;">
-          <label class="input-label" for="press-batch-number">Batch / Delivery Challan ID</label>
-          <input type="text" id="press-batch-number" placeholder="e.g. BATCH-04 or DC-8821">
+        <div style="background: var(--bg-surface-elevated); padding: 12px; border-radius: var(--radius-md); margin-bottom: 14px; border: 1px solid var(--border-subtle);">
+          <span style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-bottom: 2px;">Current Logged Inflow:</span>
+          <strong id="audit-press-current-qty" style="font-size: 1.15rem; color: var(--cs-cyan); display: block;">2,500 copies</strong>
         </div>
 
         <div style="margin-bottom: 12px;">
-          <label class="input-label" for="press-batch-qty">Copies Received *</label>
-          <input type="number" id="press-batch-qty" min="1" max="100000" placeholder="e.g. 500" value="500">
-          <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
-            <button type="button" class="btn-pill btn-pill-subtle btn-press-preset" data-qty="100">+100</button>
-            <button type="button" class="btn-pill btn-pill-subtle btn-press-preset" data-qty="250">+250</button>
-            <button type="button" class="btn-pill btn-pill-subtle btn-press-preset" data-qty="500">+500</button>
-            <button type="button" class="btn-pill btn-pill-subtle btn-press-preset" data-qty="1000">+1,000</button>
-          </div>
+          <label class="input-label" for="audit-press-new-qty">Corrected Total Press Quantity *</label>
+          <input type="number" id="audit-press-new-qty" min="0" max="1000000" placeholder="e.g. 2500">
         </div>
 
         <div style="margin-bottom: 12px;">
-          <label class="input-label" for="press-batch-source">Press / Printing Provider</label>
-          <input type="text" id="press-batch-source" placeholder="e.g. Al-Huda Offset Press, Kozhikode">
+          <label class="input-label" for="audit-press-reason">Correction Reason Code *</label>
+          <select id="audit-press-reason">
+            <option value="Physical Miscount Correction">Physical Miscount Correction</option>
+            <option value="Damaged Bundles from Press">Damaged Bundles from Press</option>
+            <option value="Delivery Challan Reconciliation">Delivery Challan Reconciliation</option>
+            <option value="Audit Inspection Adjustment">Audit Inspection Adjustment</option>
+          </select>
         </div>
 
-        <div style="margin-bottom: 18px;">
-          <label class="input-label" for="press-batch-notes">Notes / Consignment Details</label>
-          <input type="text" id="press-batch-notes" placeholder="e.g. Morning consignment, 10 bundles of 50">
+        <div style="margin-bottom: 14px;">
+          <label class="input-label" for="audit-press-notes">Audit Notes / Challan Details</label>
+          <input type="text" id="audit-press-notes" placeholder="e.g. Reconciled with press dispatch voucher #8821">
         </div>
 
-        <button id="btn-submit-press-batch" class="btn-complete-sale" type="button" style="height: 48px; font-size: 1rem;">
-          Add to Vault Reserve ✓
+        <div style="margin-bottom: 20px;">
+          <label class="input-label" for="audit-press-pin">Authorization PIN (Admin or Stock Room PIN) *</label>
+          <input type="password" id="audit-press-pin" maxlength="6" inputmode="numeric" placeholder="Enter PIN">
+        </div>
+
+        <button id="btn-submit-press-audit" class="btn-complete-sale" type="button" style="height: 48px; font-size: 1rem;">
+          Save Audit Correction ✓
         </button>
       </div>
     </div>
@@ -1271,9 +1274,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="./js/qrcode.js?v=9"></script>
-  <script src="./js/seed.js?v=9"></script>
-  <script src="./js/store.js?v=9"></script>
-  <script src="./js/app.js?v=9"></script>
+  <script src="./js/qrcode.js?v=11"></script>
+  <script src="./js/seed.js?v=11"></script>
+  <script src="./js/store.js?v=11"></script>
+  <script src="./js/app.js?v=11"></script>
 </body>
 </html>

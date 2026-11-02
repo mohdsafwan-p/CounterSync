@@ -19,7 +19,7 @@ const CS_DEFAULT_SEED = {
       // Central Stock Vault
       stockRoom: {
         totalPressInflow: 2500,
-        vaultReserve: 1630,
+        vaultReserve: 2005,
         keeperName: "Vikram Malhotra & Logistics Squad",
         corrections: [
           {
@@ -54,7 +54,7 @@ const CS_DEFAULT_SEED = {
           upiId: "cs.counter01a@okhdfcbank",
           upiName: "CounterSync 01A",
           initialStock: 100,
-          currentStock: 100,
+          currentStock: 89,
           notes: "Primary rush hour desk next to Food Court",
           lowStockAlert: false
         },
@@ -66,7 +66,7 @@ const CS_DEFAULT_SEED = {
           upiId: "cs.counter01b@icici",
           upiName: "CounterSync 01B",
           initialStock: 150,
-          currentStock: 74,
+          currentStock: 127,
           notes: "Secondary rush desk near book signing tent",
           lowStockAlert: false
         },
@@ -77,7 +77,7 @@ const CS_DEFAULT_SEED = {
           volunteers: "Rohan Varma & Ananya Iyer",
           upiId: "cs.counter02a@oksbi",
           upiName: "CounterSync 02A",
-          initialStock: 100,
+          initialStock: 40,
           currentStock: 9, // <= 10 to demonstrate bold red warning & low stock alert!
           notes: "Auditorium side counter - running very low",
           lowStockAlert: true,
@@ -91,7 +91,7 @@ const CS_DEFAULT_SEED = {
           upiId: "cs.counter02b@axisbank",
           upiName: "CounterSync 02B",
           initialStock: 100,
-          currentStock: 48,
+          currentStock: 95,
           notes: "VIP reception entrance counter",
           lowStockAlert: false
         }
@@ -285,9 +285,9 @@ const CS_DEFAULT_SEED = {
           timestamp: "2026-11-01T11:00:00.000Z",
           counterId: "counter-02a",
           counterName: "Counter 02A (Auditorium Foyer)",
-          copies: 6,
-          unitPrice: 250,
-          totalAmount: 1500,
+          copies: 75,
+          unitPrice: 100,
+          totalAmount: 7500,
           paymentMode: "CASH",
           buyerName: "Bangalore University Scholars",
           buyerPhone: "9845066666",
