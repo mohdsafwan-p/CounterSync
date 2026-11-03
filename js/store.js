@@ -433,7 +433,7 @@ class CounterSyncStore {
   // --- Session Management ---
   getSession() {
     try {
-      const raw = sessionStorage.getItem(this.SESSION_KEY);
+      const raw = sessionStorage.getItem(this.SESSION_KEY) || localStorage.getItem(this.SESSION_KEY);
       return raw ? JSON.parse(raw) : null;
     } catch (e) {
       return null;
@@ -441,12 +441,19 @@ class CounterSyncStore {
   }
 
   setSession(sessionObj) {
-    sessionStorage.setItem(this.SESSION_KEY, JSON.stringify(sessionObj));
+    try {
+      const serialized = JSON.stringify(sessionObj);
+      sessionStorage.setItem(this.SESSION_KEY, serialized);
+      localStorage.setItem(this.SESSION_KEY, serialized);
+    } catch (e) {}
     this._notifySubscribers('SESSION_UPDATE', sessionObj);
   }
 
   clearSession() {
-    sessionStorage.removeItem(this.SESSION_KEY);
+    try {
+      sessionStorage.removeItem(this.SESSION_KEY);
+      localStorage.removeItem(this.SESSION_KEY);
+    } catch (e) {}
     this._notifySubscribers('SESSION_CLEAR', null);
   }
 

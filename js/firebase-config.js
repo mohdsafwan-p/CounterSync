@@ -136,40 +136,27 @@
       const provider = new firebase.auth.GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
 
-      // Detect mobile browsers or webviews where popups are blocked or fail
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-      if (isMobile) {
-        try {
-          sessionStorage.setItem('cs_auth_redirect_in_progress', 'true');
-          await auth.signInWithRedirect(provider);
-          return null;
-        } catch (err) {
-          sessionStorage.removeItem('cs_auth_redirect_in_progress');
-          if (err.code === 'auth/unauthorized-domain') {
-            const domain = window.location.hostname;
-            throw new Error(`Domain "${domain}" is not authorized. In Firebase Console -> Authentication -> Settings -> Authorized domains, add "${domain}".`);
-          }
-          throw err;
-        }
-      }
-
+      // Always attempt signInWithPopup first (on both desktop & mobile).
+      // signInWithPopup uses window postMessage and is immune to third-party cookie/cross-domain storage blocking.
       try {
         const result = await auth.signInWithPopup(provider);
+        sessionStorage.removeItem('cs_auth_redirect_in_progress');
+        localStorage.removeItem('cs_auth_redirect_in_progress');
         return result.user;
       } catch (err) {
         if (err.code === 'auth/unauthorized-domain') {
           const domain = window.location.hostname;
           throw new Error(`Domain "${domain}" is not authorized in Firebase. In Firebase Console -> Authentication -> Settings -> Authorized domains, add "${domain}".`);
         }
-        if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
-          console.warn("[CounterSync Firebase] Popup blocked or cancelled, falling back to redirect flow...");
+        if (err.code === 'auth/popup-blocked') {
+          console.warn("[CounterSync Firebase] Popup was blocked by browser, falling back to redirect flow...");
           sessionStorage.setItem('cs_auth_redirect_in_progress', 'true');
+          localStorage.setItem('cs_auth_redirect_in_progress', 'true');
           await auth.signInWithRedirect(provider);
           return null;
         }
-        if (err.code === 'auth/popup-closed-by-user') {
-          console.info("[CounterSync Firebase] Sign-in popup was closed by user.");
+        if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+          console.info("[CounterSync Firebase] Sign-in popup was closed or superseded.");
           return null;
         }
         throw err;

@@ -698,10 +698,14 @@
       }
     }
 
-    // Google Sign-In & Organizer Host Event Flow
+    // Google Sign-In & Organizer Host Event Flow (Debounced to prevent double triggers on touch)
+    let isAuthActionRunning = false;
     async function handleHostEventClick() {
-      if (window.CS_Firebase && (window.CS_Firebase.isReady || typeof window.CS_Firebase.signInWithGoogle === 'function')) {
-        try {
+      if (isAuthActionRunning) return;
+      isAuthActionRunning = true;
+
+      try {
+        if (window.CS_Firebase && (window.CS_Firebase.isReady || typeof window.CS_Firebase.signInWithGoogle === 'function')) {
           showToast('Connecting to Google Identity Services...', 'info');
           const user = await window.CS_Firebase.signInWithGoogle();
           if (user) {
@@ -709,16 +713,17 @@
             return;
           }
           // If user is null, full-page redirect is currently navigating to Google
-          if (sessionStorage.getItem('cs_auth_redirect_in_progress') === 'true') {
+          if (sessionStorage.getItem('cs_auth_redirect_in_progress') === 'true' || localStorage.getItem('cs_auth_redirect_in_progress') === 'true') {
             return;
           }
-        } catch (err) {
-          console.warn("Google Sign-In notice:", err);
-          showToast(err.message || 'Google Sign-In canceled', 'error', 8000);
-          return;
+        } else {
+          showToast('Google Authentication service is connecting. Please check your internet connection.', 'warning');
         }
-      } else {
-        showToast('Google Authentication service is connecting. Please check your internet connection.', 'warning');
+      } catch (err) {
+        console.warn("Google Sign-In notice:", err);
+        showToast(err.message || 'Google Sign-In canceled', 'error', 8000);
+      } finally {
+        setTimeout(() => { isAuthActionRunning = false; }, 1500);
       }
     }
 
@@ -746,10 +751,6 @@
         e.preventDefault();
         openJoinEvent();
       });
-      el.cardIntentStaff.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        openJoinEvent();
-      }, { passive: false });
     }
 
     // Dual Intent Click - Host an Event (Organizer)
@@ -758,10 +759,6 @@
         e.preventDefault();
         handleHostEventClick();
       });
-      el.cardIntentOrganizer.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        handleHostEventClick();
-      }, { passive: false });
     }
 
     if (el.btnBackToIntents) {
@@ -3710,9 +3707,11 @@
     if (typeof window === 'undefined' || !window.CS_Firebase) return false;
 
     // Check if returning from Google redirect
-    const wasRedirecting = sessionStorage.getItem('cs_auth_redirect_in_progress') === 'true';
+    const wasRedirecting = sessionStorage.getItem('cs_auth_redirect_in_progress') === 'true' ||
+                           localStorage.getItem('cs_auth_redirect_in_progress') === 'true';
     if (wasRedirecting) {
       sessionStorage.removeItem('cs_auth_redirect_in_progress');
+      localStorage.removeItem('cs_auth_redirect_in_progress');
       if (typeof showToast === 'function') {
         showToast('Completing Google authentication...', 'info');
       }
@@ -3731,35 +3730,46 @@
         }
       }
     } catch (err) {
-      console.error("[CounterSync Auth] Redirect auth error:", err);
-      if (typeof showToast === 'function') {
+      console.warn("[CounterSync Auth] Redirect auth error:", err);
+      if (err.message && typeof showToast === 'function') {
         showToast(err.message, 'error', 9000);
       }
     }
 
-    // 2. Real-time Firebase Auth state observer
-    if (typeof window.CS_Firebase.onAuthStateChanged === 'function') {
-      window.CS_Firebase.onAuthStateChanged(async (firebaseUser) => {
-        if (firebaseUser) {
-          const session = CS_Store.getSession();
-          if (!session || !session.role || state.currentView === 'landing' || wasRedirecting) {
-            await handleAuthenticatedUser(firebaseUser);
-          }
+    // 2. Wait for initial Firebase Auth state resolution (from IndexedDB / cache)
+    return new Promise((resolve) => {
+      let resolved = false;
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          resolve(false);
         }
-      });
-    }
+      }, wasRedirecting ? 2500 : 600);
 
-    // 3. Immediate check if already signed in
-    if (window.CS_Firebase.auth && window.CS_Firebase.auth.currentUser) {
-      const u = window.CS_Firebase.auth.currentUser;
-      const session = CS_Store.getSession();
-      if (!session || !session.role || state.currentView === 'landing' || wasRedirecting) {
-        await handleAuthenticatedUser(u);
-        return true;
+      if (typeof window.CS_Firebase.onAuthStateChanged === 'function') {
+        window.CS_Firebase.onAuthStateChanged(async (firebaseUser) => {
+          if (firebaseUser) {
+            if (!resolved) {
+              resolved = true;
+              clearTimeout(timeout);
+              await handleAuthenticatedUser(firebaseUser);
+              resolve(true);
+            } else {
+              await handleAuthenticatedUser(firebaseUser);
+            }
+          } else {
+            if (!resolved && !wasRedirecting) {
+              resolved = true;
+              clearTimeout(timeout);
+              resolve(false);
+            }
+          }
+        });
+      } else {
+        clearTimeout(timeout);
+        resolve(false);
       }
-    }
-
-    return false;
+    });
   }
 
   // --- App Initialization Bootstrapper ---

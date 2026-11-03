@@ -22,7 +22,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800;900&family=Manjari:wght@400;700&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- Bulletproof Standalone CSS -->
-  <link rel="stylesheet" href="./css/style.css?v=18">
+  <link rel="stylesheet" href="./css/style.css?v=20">
 </head>
 <body>
   <div id="app">
@@ -91,7 +91,7 @@
 
           <!-- Dual Intent Navigation Cards -->
           <div id="landing-intents" class="dual-intent-grid">
-            <div class="intent-card" id="card-intent-staff" role="button" tabindex="0" onclick="if(window.openJoinEvent) window.openJoinEvent(); else if(window.CounterSyncApp && window.CounterSyncApp.openJoinEvent) window.CounterSyncApp.openJoinEvent();">
+            <div class="intent-card" id="card-intent-staff" role="button" tabindex="0">
               <div>
                 <div class="intent-icon">🎟️</div>
                 <div class="intent-title">Join Event</div>
@@ -100,7 +100,7 @@
               <div class="intent-arrow">Staff Gateway →</div>
             </div>
 
-            <div class="intent-card" id="card-intent-organizer" role="button" tabindex="0" onclick="if(window.handleHostEventClick) window.handleHostEventClick(); else if(window.openHostEvent) window.openHostEvent();">
+            <div class="intent-card" id="card-intent-organizer" role="button" tabindex="0">
               <div>
                 <div class="intent-icon">👑</div>
                 <div class="intent-title">Host an Event</div>
@@ -1891,10 +1891,10 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js"></script>
-  <script src="./js/firebase-config.js?v=18"></script>
-  <script src="./js/qrcode.js?v=18"></script>
-  <script src="./js/seed.js?v=18"></script>
-  <script src="./js/store.js?v=18"></script>
-  <script src="./js/app.js?v=18"></script>
+  <script src="./js/firebase-config.js?v=20"></script>
+  <script src="./js/qrcode.js?v=20"></script>
+  <script src="./js/seed.js?v=20"></script>
+  <script src="./js/store.js?v=20"></script>
+  <script src="./js/app.js?v=20"></script>
 </body>
 </html>
