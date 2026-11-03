@@ -13,16 +13,16 @@
 
   // -------------------------------------------------------------
   // FIREBASE CONFIGURATION
-  // Replace the placeholder values below with your Firebase project credentials
-  // from Firebase Console -> Project Settings -> General -> Your apps -> Web App
+  // Connected Live Firebase Project: countersync-pos
   // -------------------------------------------------------------
   const DEFAULT_FIREBASE_CONFIG = {
-    apiKey: "AIzaSyDummyKey_ReplaceWithYourFirebaseApiKey",
-    authDomain: "countersync-live.firebaseapp.com",
-    projectId: "countersync-live",
-    storageBucket: "countersync-live.appspot.com",
-    messagingSenderId: "123456789012",
-    appId: "1:123456789012:web:abcdef1234567890"
+    apiKey: "AIzaSyA5PfNg_Kn6z4jcA6xsT-jcqD-xftfVgSw",
+    authDomain: "countersync-pos.firebaseapp.com",
+    projectId: "countersync-pos",
+    storageBucket: "countersync-pos.firebasestorage.app",
+    messagingSenderId: "2490966151",
+    appId: "1:2490966151:web:94bcaaa79d044f7025d822",
+    measurementId: "G-FWFVXHEQM5"
   };
 
   // Support local override or dynamic configuration from localStorage
@@ -69,6 +69,12 @@
 
       auth = firebase.auth();
       db = firebase.firestore();
+
+      if (typeof firebase.analytics === 'function' && config.measurementId) {
+        try {
+          firebase.analytics();
+        } catch (e) {}
+      }
 
       // Enable offline persistence in Firestore so all reads and writes
       // are cached in local IndexedDB automatically and work without internet!
