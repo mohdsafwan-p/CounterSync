@@ -1798,69 +1798,7 @@
       </div>
     </div>
 
-    <!-- 6. Google Sign-In Modal (Multi-Tenant & Platform Owner Hook) -->
-    <div id="modal-google-auth" class="modal-overlay hidden">
-      <div class="modal-content" style="max-width: 440px; text-align: center;">
-        <svg width="44" height="44" viewBox="0 0 24 24" style="margin-bottom: 12px;">
-          <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
-          <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.36 24 12 24z"/>
-          <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.17 0 9.99 0 12s.45 3.83 1.25 5.42l4.03-3.15z"/>
-          <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.36 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-        </svg>
-        <h3 style="margin-bottom: 6px;">Sign in with Google</h3>
-        <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 16px;">
-          Select account or enter email to authenticate with CounterSync
-        </p>
 
-        <!-- Profile 1: Safwan (Platform Owner) -->
-        <div style="background: var(--bg-surface-elevated); border: 1.5px solid rgba(0, 102, 255, 0.4); border-radius: var(--radius-md); padding: 10px 12px; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; text-align: left; cursor: pointer;" class="demo-auth-pill" onclick="window.selectDemoGoogleProfile('safwanvgd313@gmail.com', 'Safwan')">
-          <div style="width: 36px; height: 36px; border-radius: 50%; background: #0066FF; color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.9rem;">
-            👑
-          </div>
-          <div style="flex: 1; min-width: 0;">
-            <div style="font-weight: 800; font-size: 0.88rem; color: var(--text-primary);">Safwan (Platform Owner)</div>
-            <div style="font-size: 0.74rem; color: #0066FF; font-weight: 600;">safwanvgd313@gmail.com</div>
-          </div>
-          <span style="font-size: 0.72rem; font-weight: 800; background: rgba(0,102,255,0.12); color: #0066FF; padding: 2px 7px; border-radius: 9999px;">Owner</span>
-        </div>
-
-        <!-- Profile 2: Existing Host (Kerala Lit Fest) -->
-        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 10px 12px; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; text-align: left; cursor: pointer;" class="demo-auth-pill" onclick="window.selectDemoGoogleProfile('rahul.organizer@keralalitfest.org', 'Rahul Menon')">
-          <div style="width: 36px; height: 36px; border-radius: 50%; background: #10B981; color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.85rem;">
-            RM
-          </div>
-          <div style="flex: 1; min-width: 0;">
-            <div style="font-weight: 700; font-size: 0.88rem;">Rahul Menon (Kerala Lit Fest)</div>
-            <div style="font-size: 0.74rem; color: var(--text-secondary);">rahul.organizer@keralalitfest.org</div>
-          </div>
-          <span style="font-size: 0.72rem; font-weight: 700; background: rgba(245,158,11,0.12); color: #F59E0B; padding: 2px 7px; border-radius: 9999px;">Pending Host</span>
-        </div>
-
-        <!-- Profile 3: New Applicant -->
-        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 10px 12px; display: flex; align-items: center; gap: 10px; margin-bottom: 14px; text-align: left; cursor: pointer;" class="demo-auth-pill" onclick="window.selectDemoGoogleProfile('ananya.host@mumbaibookfair.in', 'Ananya Sharma')">
-          <div style="width: 36px; height: 36px; border-radius: 50%; background: #8B5CF6; color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.85rem;">
-            AS
-          </div>
-          <div style="flex: 1; min-width: 0;">
-            <div style="font-weight: 700; font-size: 0.88rem;">Ananya Sharma (New Host)</div>
-            <div style="font-size: 0.74rem; color: var(--text-secondary);">ananya.host@mumbaibookfair.in</div>
-          </div>
-          <span style="font-size: 0.72rem; font-weight: 700; background: rgba(59,130,246,0.12); color: #3B82F6; padding: 2px 7px; border-radius: 9999px;">New Rental</span>
-        </div>
-
-        <div style="margin-bottom: 14px; text-align: left;">
-          <label style="font-size: 0.72rem; font-weight: 700; color: var(--text-secondary);">OR ENTER ANY CUSTOM GOOGLE EMAIL:</label>
-          <input type="email" id="custom-google-email-input" class="form-input" placeholder="your.name@gmail.com" style="margin-top: 4px;">
-        </div>
-
-        <button id="btn-confirm-google-login" class="btn-complete-sale" style="height: 46px; font-size: 0.95rem; margin-bottom: 8px;">
-          Continue with Selected Account →
-        </button>
-        <button type="button" class="btn-pill" style="width: 100%; height: 36px; background: transparent; color: var(--text-muted); border: 1px solid var(--border-subtle);" onclick="document.getElementById('modal-google-auth').classList.add('hidden')">
-          Cancel
-        </button>
-      </div>
-    </div>
 
     <!-- 7. Platform Owner Rental Approval Modal -->
     <div id="modal-rental-approval" class="modal-overlay hidden">

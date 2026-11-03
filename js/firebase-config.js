@@ -160,12 +160,16 @@
       } catch (err) {
         if (err.code === 'auth/unauthorized-domain') {
           const domain = window.location.hostname;
-          throw new Error(`Domain "${domain}" is not authorized. In Firebase Console -> Authentication -> Settings -> Authorized domains, add "${domain}".`);
+          throw new Error(`Domain "${domain}" is not authorized in Firebase. In Firebase Console -> Authentication -> Settings -> Authorized domains, add "${domain}".`);
         }
-        if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
-          console.warn("[CounterSync Firebase] Popup blocked or closed, falling back to redirect flow...");
+        if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+          console.warn("[CounterSync Firebase] Popup blocked or cancelled, falling back to redirect flow...");
           sessionStorage.setItem('cs_auth_redirect_in_progress', 'true');
           await auth.signInWithRedirect(provider);
+          return null;
+        }
+        if (err.code === 'auth/popup-closed-by-user') {
+          console.info("[CounterSync Firebase] Sign-in popup was closed by user.");
           return null;
         }
         throw err;

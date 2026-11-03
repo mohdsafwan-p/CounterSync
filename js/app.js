@@ -700,7 +700,7 @@
 
     // Google Sign-In & Organizer Host Event Flow
     async function handleHostEventClick() {
-      if (window.CS_Firebase && window.CS_Firebase.isReady) {
+      if (window.CS_Firebase && (window.CS_Firebase.isReady || typeof window.CS_Firebase.signInWithGoogle === 'function')) {
         try {
           showToast('Connecting to Google Identity Services...', 'info');
           const user = await window.CS_Firebase.signInWithGoogle();
@@ -717,9 +717,9 @@
           showToast(err.message || 'Google Sign-In canceled', 'error', 8000);
           return;
         }
+      } else {
+        showToast('Google Authentication service is connecting. Please check your internet connection.', 'warning');
       }
-      const modal = document.getElementById('modal-google-auth');
-      if (modal) modal.classList.remove('hidden');
     }
 
     // Expose on window for fail-safe direct inline click triggers
@@ -849,70 +849,11 @@
 
     // Google Sign-In Flow Hook
     if (el.btnGoogleAuth) {
-      el.btnGoogleAuth.addEventListener('click', async () => {
-        if (window.CS_Firebase && window.CS_Firebase.isReady) {
-          try {
-            showToast('Connecting to Google Identity Services...', 'info');
-            const user = await window.CS_Firebase.signInWithGoogle();
-            if (user) {
-              state.eventKey = state.eventKey || 'CS2026';
-              state.role = 'ADMIN';
-              CS_Store.setSession({
-                role: 'ADMIN',
-                eventKey: state.eventKey,
-                user: {
-                  displayName: user.displayName,
-                  email: user.email,
-                  photoURL: user.photoURL,
-                  uid: user.uid
-                }
-              });
-              CS_Store.initCloudSync(state.eventKey);
-              CS_Audio.handshakeSuccess();
-              showToast(`Welcome, ${user.displayName || user.email}! Authenticated as Super Admin`, 'success');
-              navigateTo('admin');
-            }
-          } catch (err) {
-            console.warn("Google Sign-In notice:", err);
-            showToast(err.message || 'Google Sign-In canceled', 'error');
-          }
-        } else {
-          const modal = document.getElementById('modal-google-auth');
-          if (modal) modal.classList.remove('hidden');
-        }
+      el.btnGoogleAuth.addEventListener('click', async (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        await handleHostEventClick();
       });
     }
-
-    const btnConfirmGoogle = document.getElementById('btn-confirm-google-login');
-    if (btnConfirmGoogle) {
-      btnConfirmGoogle.addEventListener('click', async () => {
-        const modal = document.getElementById('modal-google-auth');
-        if (modal) modal.classList.add('hidden');
-
-        const customInput = document.getElementById('custom-google-email-input');
-        const email = (customInput && customInput.value.trim()) || window._selectedDemoEmail || 'safwanvgd313@gmail.com';
-        const displayName = window._selectedDemoName || email.split('@')[0];
-
-        await handleAuthenticatedUser({
-          email: email,
-          displayName: displayName,
-          uid: 'demo-' + Date.now()
-        });
-      });
-    }
-
-    window.selectDemoGoogleProfile = function(email, name) {
-      window._selectedDemoEmail = email;
-      window._selectedDemoName = name;
-      const input = document.getElementById('custom-google-email-input');
-      if (input) input.value = email;
-      document.querySelectorAll('.demo-auth-pill').forEach(item => {
-        item.style.borderColor = 'var(--border-subtle)';
-      });
-      if (window.event && window.event.currentTarget) {
-        window.event.currentTarget.style.borderColor = '#0066FF';
-      }
-    };
 
     // Header Exit button
     if (el.btnHeaderLogout) {
@@ -3766,7 +3707,7 @@
 
   // --- Firebase Google Auth & Redirect Result Listener ---
   async function initFirebaseAuthListener() {
-    if (typeof window === 'undefined' || !window.CS_Firebase) return;
+    if (typeof window === 'undefined' || !window.CS_Firebase) return false;
 
     // Check if returning from Google redirect
     const wasRedirecting = sessionStorage.getItem('cs_auth_redirect_in_progress') === 'true';
@@ -3786,7 +3727,7 @@
             showToast(`Signed in as ${redirectUser.displayName || redirectUser.email}`, 'success');
           }
           await handleAuthenticatedUser(redirectUser);
-          return;
+          return true;
         }
       }
     } catch (err) {
@@ -3807,10 +3748,22 @@
         }
       });
     }
+
+    // 3. Immediate check if already signed in
+    if (window.CS_Firebase.auth && window.CS_Firebase.auth.currentUser) {
+      const u = window.CS_Firebase.auth.currentUser;
+      const session = CS_Store.getSession();
+      if (!session || !session.role || state.currentView === 'landing' || wasRedirecting) {
+        await handleAuthenticatedUser(u);
+        return true;
+      }
+    }
+
+    return false;
   }
 
   // --- App Initialization Bootstrapper ---
-  function init() {
+  async function init() {
     try {
       cacheDOMElements();
       initTheme();
@@ -3824,7 +3777,10 @@
       registerServiceWorker();
 
       // Hook Firebase authentication redirect & state listeners
-      initFirebaseAuthListener();
+      const authHandled = await initFirebaseAuthListener();
+      if (authHandled) {
+        return;
+      }
 
       // Triple tap logo on landing for direct owner login
       let logoClicks = 0;
