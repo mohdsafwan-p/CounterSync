@@ -244,6 +244,47 @@
       }
     },
 
+    // --- SaaS Platform Rentals Synchronization ---
+    async syncRentalsToCloud(rentals) {
+      if (!isInitialized || !db || isDummyConfig || !rentals) {
+        return false;
+      }
+      try {
+        const docRef = db.collection('platform').doc('rentals_registry');
+        await docRef.set({
+          rentals: JSON.parse(JSON.stringify(rentals)),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          lastUpdatedISO: new Date().toISOString()
+        }, { merge: true });
+        return true;
+      } catch (err) {
+        console.warn("[CounterSync Firebase] Rentals sync notice:", err.message);
+        return false;
+      }
+    },
+
+    listenToRentals(onUpdateCallback) {
+      if (!isInitialized || !db || isDummyConfig) {
+        return () => {};
+      }
+      try {
+        const docRef = db.collection('platform').doc('rentals_registry');
+        return docRef.onSnapshot((snap) => {
+          if (snap.exists) {
+            const data = snap.data();
+            if (data && data.rentals && typeof onUpdateCallback === 'function') {
+              onUpdateCallback(data.rentals);
+            }
+          }
+        }, (err) => {
+          console.warn("[CounterSync Firebase] Rentals listener notice:", err.message);
+        });
+      } catch (err) {
+        console.error("[CounterSync Firebase] Error listening to rentals:", err);
+        return () => {};
+      }
+    },
+
     stopListening() {
       if (activeListenerUnsub) {
         activeListenerUnsub();

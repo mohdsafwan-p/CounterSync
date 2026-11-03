@@ -126,6 +126,10 @@
     el.viewPOS = document.getElementById('view-pos');
     el.viewStockroom = document.getElementById('view-stockroom');
     el.viewAdmin = document.getElementById('view-admin');
+    el.viewOwnerPortal = document.getElementById('view-owner-portal');
+    el.viewHostRequest = document.getElementById('view-host-request');
+    el.viewRentalStatus = document.getElementById('view-rental-status');
+    el.modalRentalApproval = document.getElementById('modal-rental-approval');
 
     // Landing screen elements
     el.landingIntents = document.getElementById('landing-intents');
@@ -309,6 +313,22 @@
 
   // --- View Switcher ---
   function navigateTo(viewName) {
+    // Strict Platform Owner Portal Security Guard
+    if (viewName === 'owner-portal') {
+      const session = CS_Store.getSession();
+      const user = state.currentUser || (session ? session.user : null);
+      const email = user ? (user.email || '') : '';
+      if (!CS_Store.isPlatformOwner(email)) {
+        if (typeof showToast === 'function') {
+          showToast('Access Denied: Only platform owner (safwanvgd313@gmail.com) can access this console.', 'error');
+        }
+        if (typeof CS_Audio !== 'undefined' && CS_Audio.alertWarning) {
+          CS_Audio.alertWarning();
+        }
+        viewName = 'landing';
+      }
+    }
+
     state.currentView = viewName;
 
     // Header auto-hiding behavior: Hidden on gateway landing screen
@@ -329,10 +349,13 @@
     el.viewPOS.classList.toggle('hidden', viewName !== 'pos');
     el.viewStockroom.classList.toggle('hidden', viewName !== 'stockroom');
     el.viewAdmin.classList.toggle('hidden', viewName !== 'admin');
+    if (el.viewOwnerPortal) el.viewOwnerPortal.classList.toggle('hidden', viewName !== 'owner-portal');
+    if (el.viewHostRequest) el.viewHostRequest.classList.toggle('hidden', viewName !== 'host-request');
+    if (el.viewRentalStatus) el.viewRentalStatus.classList.toggle('hidden', viewName !== 'rental-status');
 
     // Quick lock visibility
-    el.btnQuickLock.classList.toggle('hidden', viewName === 'landing');
-    el.idleTimerDisplay.classList.toggle('hidden', viewName === 'landing');
+    el.btnQuickLock.classList.toggle('hidden', viewName === 'landing' || viewName === 'owner-portal');
+    el.idleTimerDisplay.classList.toggle('hidden', viewName === 'landing' || viewName === 'owner-portal');
 
     // Update context badge
     const event = CS_Store.getEvent(state.eventKey);
@@ -351,6 +374,18 @@
       el.headerEventLabel.textContent = `${state.eventKey} • Master Super Admin`;
       if (el.headerStaffPill) el.headerStaffPill.textContent = 'Admin';
       renderAdminDashboard();
+    } else if (viewName === 'owner-portal') {
+      el.headerEventLabel.textContent = 'Platform Owner • Master SaaS Console';
+      if (el.headerStaffPill) el.headerStaffPill.textContent = 'Owner';
+      renderOwnerPortal();
+    } else if (viewName === 'host-request') {
+      el.headerEventLabel.textContent = 'Event Rental Request';
+      if (el.headerStaffPill) el.headerStaffPill.textContent = 'Rental';
+      renderHostRequestView();
+    } else if (viewName === 'rental-status') {
+      el.headerEventLabel.textContent = 'Rental License Status';
+      if (el.headerStaffPill) el.headerStaffPill.textContent = 'License';
+      renderRentalStatusView();
     }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -585,6 +620,84 @@
       if (el.landingIntents) el.landingIntents.classList.remove('hidden');
     }
 
+    // Google & Multi-Tenant Authentication Dispatcher
+    async function handleAuthenticatedUser(user) {
+      if (!user || !user.email) return;
+      state.currentUser = user;
+      const email = (user.email || '').toLowerCase().trim();
+
+      // 1. Master Check: Is user Safwan (Platform Owner)?
+      if (CS_Store.isPlatformOwner(email)) {
+        state.role = 'OWNER';
+        state.eventKey = state.eventKey || 'CS2026';
+        CS_Store.setSession({
+          role: 'OWNER',
+          eventKey: state.eventKey,
+          user: {
+            displayName: user.displayName || 'Safwan',
+            email: user.email,
+            photoURL: user.photoURL,
+            uid: user.uid,
+            isOwner: true
+          }
+        });
+        if (typeof CS_Audio !== 'undefined' && CS_Audio.handshakeSuccess) {
+          CS_Audio.handshakeSuccess();
+        }
+        showToast('Welcome Safwan! Authenticated as Platform Owner.', 'success');
+        navigateTo('owner-portal');
+        return;
+      }
+
+      // 2. Tenant Check: Check rental license registry
+      const rental = CS_Store.getRentalByEmail(email);
+
+      if (!rental) {
+        showToast(`Google account verified (${user.email}). Please complete your event rental request.`, 'info');
+        navigateTo('host-request');
+        return;
+      }
+
+      state.currentRental = rental;
+
+      if (rental.status === 'PENDING') {
+        navigateTo('rental-status');
+        return;
+      }
+
+      if (rental.status === 'DENIED' || rental.status === 'SUSPENDED') {
+        navigateTo('rental-status');
+        return;
+      }
+
+      if (rental.status === 'ACTIVE') {
+        // Check expiration date
+        if (rental.expiresAt && new Date() > new Date(rental.expiresAt)) {
+          navigateTo('rental-status');
+          return;
+        }
+
+        state.role = 'ADMIN';
+        state.eventKey = rental.eventKey;
+        CS_Store.setSession({
+          role: 'ADMIN',
+          eventKey: rental.eventKey,
+          user: {
+            displayName: user.displayName,
+            email: user.email,
+            photoURL: user.photoURL,
+            uid: user.uid
+          }
+        });
+        CS_Store.initCloudSync(rental.eventKey);
+        if (typeof CS_Audio !== 'undefined' && CS_Audio.handshakeSuccess) {
+          CS_Audio.handshakeSuccess();
+        }
+        showToast(`Welcome ${user.displayName || user.email}! Connected to ${rental.eventName}`, 'success');
+        navigateTo('admin');
+      }
+    }
+
     // Google Sign-In & Organizer Host Event Flow
     async function handleHostEventClick() {
       if (window.CS_Firebase && window.CS_Firebase.isReady) {
@@ -592,22 +705,7 @@
           showToast('Connecting to Google Identity Services...', 'info');
           const user = await window.CS_Firebase.signInWithGoogle();
           if (user) {
-            state.eventKey = state.eventKey || 'CS2026';
-            state.role = 'ADMIN';
-            CS_Store.setSession({
-              role: 'ADMIN',
-              eventKey: state.eventKey,
-              user: {
-                displayName: user.displayName,
-                email: user.email,
-                photoURL: user.photoURL,
-                uid: user.uid
-              }
-            });
-            CS_Store.initCloudSync(state.eventKey);
-            CS_Audio.handshakeSuccess();
-            showToast(`Welcome, ${user.displayName || user.email}! Authenticated as Super Admin`, 'success');
-            navigateTo('admin');
+            await handleAuthenticatedUser(user);
             return;
           }
         } catch (err) {
@@ -615,7 +713,8 @@
           showToast(err.message || 'Google Sign-In canceled', 'error');
         }
       }
-      openHostEvent();
+      const modal = document.getElementById('modal-google-auth');
+      if (modal) modal.classList.remove('hidden');
     }
 
     // Expose on window for fail-safe direct inline click triggers
@@ -781,18 +880,34 @@
 
     const btnConfirmGoogle = document.getElementById('btn-confirm-google-login');
     if (btnConfirmGoogle) {
-      btnConfirmGoogle.addEventListener('click', () => {
+      btnConfirmGoogle.addEventListener('click', async () => {
         const modal = document.getElementById('modal-google-auth');
         if (modal) modal.classList.add('hidden');
-        state.eventKey = 'CS2026';
-        state.role = 'ADMIN';
-        CS_Store.setSession({ role: 'ADMIN', eventKey: 'CS2026' });
-        CS_Store.initCloudSync('CS2026');
-        CS_Audio.handshakeSuccess();
-        showToast('Google Sign-In Verified: Authenticated as Super Admin', 'success');
-        navigateTo('admin');
+
+        const customInput = document.getElementById('custom-google-email-input');
+        const email = (customInput && customInput.value.trim()) || window._selectedDemoEmail || 'safwanvgd313@gmail.com';
+        const displayName = window._selectedDemoName || email.split('@')[0];
+
+        await handleAuthenticatedUser({
+          email: email,
+          displayName: displayName,
+          uid: 'demo-' + Date.now()
+        });
       });
     }
+
+    window.selectDemoGoogleProfile = function(email, name) {
+      window._selectedDemoEmail = email;
+      window._selectedDemoName = name;
+      const input = document.getElementById('custom-google-email-input');
+      if (input) input.value = email;
+      document.querySelectorAll('.demo-auth-pill').forEach(item => {
+        item.style.borderColor = 'var(--border-subtle)';
+      });
+      if (window.event && window.event.currentTarget) {
+        window.event.currentTarget.style.borderColor = '#0066FF';
+      }
+    };
 
     // Header Exit button
     if (el.btnHeaderLogout) {
@@ -825,6 +940,16 @@
     if (!rawKey) {
       showToast('Please enter an event access key (e.g. CS2026)', 'error');
       if (el.inputEventKey) el.inputEventKey.focus();
+      return;
+    }
+
+    // Rental License Validation Check
+    const license = CS_Store.isEventLicenseValid(rawKey);
+    if (!license.valid) {
+      if (typeof CS_Audio !== 'undefined' && CS_Audio.alertWarning) CS_Audio.alertWarning();
+      showToast(`Access Denied: ${license.reason}. Contact your event organizer or safwanvgd313@gmail.com.`, 'error');
+      if (el.scopedCounterPicker) el.scopedCounterPicker.classList.add('hidden');
+      if (el.joinStepBadge) el.joinStepBadge.textContent = 'Step 1 of 2';
       return;
     }
 
@@ -2991,6 +3116,592 @@
     });
   }
 
+  // --- 5. Platform Owner Portal (Safwan Exclusive Console) ---
+  function renderOwnerPortal() {
+    const rentals = CS_Store.getPlatformRentals();
+    const data = CS_Store.getData();
+
+    // 1. KPI Aggregation
+    const pendingCount = rentals.filter(r => r.status === 'PENDING').length;
+    const activeCount = rentals.filter(r => r.status === 'ACTIVE').length;
+
+    let totalSold = 0;
+    let totalRevenue = 0;
+    if (data.events) {
+      Object.values(data.events).forEach(ev => {
+        if (ev.transactions) {
+          ev.transactions.forEach(t => {
+            if (!t.voided && t.type !== 'VIP' && t.paymentMode !== 'FREE_VIP') {
+              totalSold += (t.copies || 0);
+              totalRevenue += (t.totalAmount || 0);
+            }
+          });
+        }
+      });
+    }
+
+    const elPending = document.getElementById('owner-kpi-pending');
+    const elActive = document.getElementById('owner-kpi-active');
+    const elSold = document.getElementById('owner-kpi-sold');
+    const elRev = document.getElementById('owner-kpi-revenue');
+    const elInboxCounter = document.getElementById('owner-inbox-counter');
+    const elEventsCounter = document.getElementById('owner-events-counter');
+
+    if (elPending) elPending.textContent = pendingCount;
+    if (elActive) elActive.textContent = activeCount;
+    if (elSold) elSold.textContent = totalSold.toLocaleString();
+    if (elRev) elRev.textContent = `₹${totalRevenue.toLocaleString()}`;
+    if (elInboxCounter) elInboxCounter.textContent = pendingCount;
+    if (elEventsCounter) elEventsCounter.textContent = Object.keys(data.events || {}).length;
+
+    // 2. Render Inbox (Applications)
+    const listEl = document.getElementById('owner-rental-requests-list');
+    if (listEl) {
+      if (rentals.length === 0) {
+        listEl.innerHTML = `<div style="text-align: center; padding: 32px; color: var(--text-muted);">No rental applications yet.</div>`;
+      } else {
+        listEl.innerHTML = rentals.map(r => {
+          const statusClass = (r.status || 'pending').toLowerCase();
+          const isPending = r.status === 'PENDING';
+          const isActive = r.status === 'ACTIVE';
+          const isExpired = r.expiresAt && new Date() > new Date(r.expiresAt);
+          const expiryText = r.expiresAt ? new Date(r.expiresAt).toLocaleDateString() : 'None';
+
+          return `
+            <div class="rental-item-card">
+              <div class="rental-card-header">
+                <div>
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                    <span style="font-weight: 800; font-size: 1.05rem;">${r.eventName || 'Unnamed Event'}</span>
+                    <span class="font-mono" style="background: rgba(0,102,255,0.12); color: #0066FF; font-weight: 800; padding: 2px 8px; border-radius: 6px; font-size: 0.80rem;">${r.eventKey || 'TBD'}</span>
+                  </div>
+                  <div style="font-size: 0.82rem; color: var(--text-secondary);">
+                    <strong>${r.hostName || 'Host'}</strong> • ${r.organization || 'Org'} • <a href="mailto:${r.hostEmail}" style="color: #0066FF; text-decoration: none;">${r.hostEmail}</a>
+                  </div>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <span class="rental-badge ${isExpired && isActive ? 'expired' : statusClass}">
+                    ${isExpired && isActive ? 'EXPIRED' : r.status}
+                  </span>
+                </div>
+              </div>
+
+              <div class="rental-meta-grid">
+                <div class="rental-meta-cell">
+                  <span class="rental-meta-title">Requested Dates</span>
+                  <span class="rental-meta-val">${r.startsAt ? new Date(r.startsAt).toLocaleDateString() : 'ASAP'} → ${expiryText}</span>
+                </div>
+                <div class="rental-meta-cell">
+                  <span class="rental-meta-title">Counters Quota</span>
+                  <span class="rental-meta-val">${r.allowedCounters || 3} Desks</span>
+                </div>
+                <div class="rental-meta-cell">
+                  <span class="rental-meta-title">Book & Price</span>
+                  <span class="rental-meta-val">${r.bookTitle || 'Book'} (₹${r.unitPrice || 100})</span>
+                </div>
+                <div class="rental-meta-cell">
+                  <span class="rental-meta-title">Contact Phone</span>
+                  <span class="rental-meta-val">${r.phone ? `<a href="https://wa.me/${r.phone.replace(/[^0-9]/g, '')}" target="_blank" style="color: #10B981; text-decoration: none;">📱 ${r.phone}</a>` : 'Not provided'}</span>
+                </div>
+              </div>
+
+              ${r.notes ? `<div style="font-size: 0.78rem; color: var(--text-secondary); background: var(--bg-surface); padding: 8px 12px; border-radius: 8px; margin-bottom: 10px;"><strong>Notes:</strong> ${r.notes}</div>` : ''}
+
+              <div class="rental-actions-row">
+                ${isPending ? `
+                  <button class="btn-pill btn-pill-primary" onclick="window.openRentalApprovalModal('${r.id}')" style="font-size: 0.80rem; padding: 6px 14px;">
+                    👑 Approve & Grant Access
+                  </button>
+                  <button class="btn-pill" style="font-size: 0.80rem; padding: 6px 14px; background: rgba(239, 68, 68, 0.12); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.3);" onclick="window.handleDenyRental('${r.id}')">
+                    ⛔ Reject Request
+                  </button>
+                ` : ''}
+
+                ${isActive ? `
+                  <button class="btn-pill btn-pill-subtle" onclick="window.handleExtendRentalPrompt('${r.id}')" style="font-size: 0.80rem; padding: 6px 12px;">
+                    ⏱️ Extend Expiry
+                  </button>
+                  <button class="btn-pill" style="font-size: 0.80rem; padding: 6px 12px; background: rgba(239, 68, 68, 0.12); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.3);" onclick="window.handleSuspendRental('${r.id}')">
+                    ⛔ Deny Access / Revoke License
+                  </button>
+                  <button class="btn-pill btn-pill-subtle" onclick="window.handleOwnerInspectEvent('${r.eventKey}')" style="font-size: 0.80rem; padding: 6px 12px;">
+                    👁️ Inspect Event Admin
+                  </button>
+                ` : ''}
+
+                ${!isPending && !isActive ? `
+                  <button class="btn-pill btn-pill-subtle" onclick="window.openRentalApprovalModal('${r.id}')" style="font-size: 0.80rem; padding: 6px 12px;">
+                    🔄 Reactivate License
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    // 3. Render Fleet Events List
+    const fleetEl = document.getElementById('owner-active-events-list');
+    if (fleetEl && data.events) {
+      const eventKeys = Object.keys(data.events);
+      if (eventKeys.length === 0) {
+        fleetEl.innerHTML = `<div style="text-align: center; padding: 32px; color: var(--text-muted);">No events registered.</div>`;
+      } else {
+        fleetEl.innerHTML = eventKeys.map(key => {
+          const ev = data.events[key];
+          const rental = rentals.find(r => (r.eventKey || '').toUpperCase() === key.toUpperCase());
+          let sold = 0;
+          let rev = 0;
+          if (ev.transactions) {
+            ev.transactions.forEach(t => {
+              if (!t.voided && t.type !== 'VIP' && t.paymentMode !== 'FREE_VIP') {
+                sold += (t.copies || 0);
+                rev += (t.totalAmount || 0);
+              }
+            });
+          }
+          const countersCount = (ev.counters || []).length;
+          const status = rental ? rental.status : 'ACTIVE';
+          const isExpired = rental && rental.expiresAt && new Date() > new Date(rental.expiresAt);
+
+          return `
+            <div class="rental-item-card">
+              <div class="rental-card-header">
+                <div>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-weight: 800; font-size: 1.05rem;">${ev.name || key}</span>
+                    <span class="font-mono" style="background: rgba(0,102,255,0.12); color: #0066FF; font-weight: 800; padding: 2px 8px; border-radius: 6px; font-size: 0.80rem;">${key}</span>
+                  </div>
+                  <div style="font-size: 0.80rem; color: var(--text-secondary); margin-top: 3px;">
+                    Book: <strong>${ev.bookTitle || 'Untitled'}</strong> (₹${ev.unitPrice || 100}) • Host: ${rental ? rental.hostEmail : 'Master Admin'}
+                  </div>
+                </div>
+                <span class="rental-badge ${isExpired ? 'expired' : (status === 'ACTIVE' ? 'active' : 'denied')}">
+                  ${isExpired ? 'EXPIRED' : status}
+                </span>
+              </div>
+
+              <div class="rental-meta-grid">
+                <div class="rental-meta-cell">
+                  <span class="rental-meta-title">Live Counters</span>
+                  <span class="rental-meta-val">${countersCount} Active</span>
+                </div>
+                <div class="rental-meta-cell">
+                  <span class="rental-meta-title">Total Sold</span>
+                  <span class="rental-meta-val" style="color: #0066FF;">${sold} Copies</span>
+                </div>
+                <div class="rental-meta-cell">
+                  <span class="rental-meta-title">Gross Revenue</span>
+                  <span class="rental-meta-val" style="color: #10B981;">₹${rev.toLocaleString()}</span>
+                </div>
+                <div class="rental-meta-cell">
+                  <span class="rental-meta-title">License Expiry</span>
+                  <span class="rental-meta-val">${rental && rental.expiresAt ? new Date(rental.expiresAt).toLocaleDateString() : 'Permanent'}</span>
+                </div>
+              </div>
+
+              <div class="rental-actions-row">
+                <button class="btn-pill btn-pill-subtle" onclick="window.handleOwnerInspectEvent('${key}')" style="font-size: 0.80rem; padding: 6px 12px;">
+                  👁️ Inspect Admin View
+                </button>
+                ${rental ? `
+                  <button class="btn-pill btn-pill-subtle" onclick="window.handleExtendRentalPrompt('${rental.id}')" style="font-size: 0.80rem; padding: 6px 12px;">
+                    ⏱️ Extend Rental
+                  </button>
+                  <button class="btn-pill" style="font-size: 0.80rem; padding: 6px 12px; background: rgba(239, 68, 68, 0.12); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.3);" onclick="window.handleSuspendRental('${rental.id}')">
+                    ⛔ Deny Access / Revoke
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+  }
+
+  window.openRentalApprovalModal = function(rentalId) {
+    const rentals = CS_Store.getPlatformRentals();
+    const rental = rentals.find(r => r.id === rentalId);
+    if (!rental) return;
+
+    const elId = document.getElementById('approve-rental-id');
+    const elName = document.getElementById('approve-host-name-display');
+    const elEmail = document.getElementById('approve-host-email-display');
+    const elKey = document.getElementById('approve-event-key');
+    const elCounters = document.getElementById('approve-allowed-counters');
+    const elExpires = document.getElementById('approve-expires-at');
+    const elNotes = document.getElementById('approve-notes');
+
+    if (elId) elId.value = rental.id;
+    if (elName) elName.textContent = rental.hostName || 'Host';
+    if (elEmail) elEmail.textContent = rental.hostEmail || '';
+    if (elKey) elKey.value = rental.eventKey || 'CS' + Math.floor(1000 + Math.random() * 9000);
+    if (elCounters) elCounters.value = String(rental.allowedCounters || 3);
+    
+    const defaultExpiry = rental.expiresAt ? rental.expiresAt.split('T')[0] : new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+    if (elExpires) elExpires.value = defaultExpiry;
+    if (elNotes) elNotes.value = rental.notes || 'Approved festival license';
+
+    const modal = document.getElementById('modal-rental-approval');
+    if (modal) modal.classList.remove('hidden');
+  };
+
+  window.setApprovalPresetDays = function(days) {
+    const targetDate = new Date(Date.now() + days * 86400000).toISOString().split('T')[0];
+    const el = document.getElementById('approve-expires-at');
+    if (el) el.value = targetDate;
+  };
+
+  window.handleDenyRental = function(rentalId) {
+    const reason = prompt('Enter reason for declining this rental request (e.g. Dates unavailable, quota full):', 'Rental request declined by platform administrator');
+    if (reason === null) return;
+    CS_Store.denyRental(rentalId, reason);
+    if (typeof CS_Audio !== 'undefined' && CS_Audio.alertWarning) CS_Audio.alertWarning();
+    showToast('Rental request rejected.', 'info');
+    renderOwnerPortal();
+  };
+
+  window.handleSuspendRental = function(rentalId) {
+    if (confirm('Deny / Revoke access for this host? Once revoked, the host and all counter terminals for this event will be immediately locked out.')) {
+      CS_Store.suspendRental(rentalId, 'Access revoked by platform owner (safwanvgd313@gmail.com)');
+      if (typeof CS_Audio !== 'undefined' && CS_Audio.alertWarning) CS_Audio.alertWarning();
+      showToast('Rental license revoked. Access denied.', 'info');
+      renderOwnerPortal();
+    }
+  };
+
+  window.handleExtendRentalPrompt = function(rentalId) {
+    const rentals = CS_Store.getPlatformRentals();
+    const rental = rentals.find(r => r.id === rentalId);
+    if (!rental) return;
+
+    const currentExpiry = rental.expiresAt ? rental.expiresAt.split('T')[0] : new Date().toISOString().split('T')[0];
+    const newExpiry = prompt(`Extend rental expiration date for "${rental.eventName}" (YYYY-MM-DD):`, currentExpiry);
+    if (!newExpiry) return;
+
+    const isoDate = new Date(newExpiry + 'T23:59:59.000Z').toISOString();
+    CS_Store.extendRental(rentalId, isoDate);
+    if (typeof CS_Audio !== 'undefined' && CS_Audio.handshakeSuccess) CS_Audio.handshakeSuccess();
+    showToast(`Rental extended until ${new Date(isoDate).toLocaleDateString()}!`, 'success');
+    renderOwnerPortal();
+  };
+
+  window.handleOwnerInspectEvent = function(eventKey) {
+    state.eventKey = eventKey;
+    state.role = 'ADMIN';
+    showToast(`Switching to ${eventKey} Super Admin Console...`, 'info');
+    navigateTo('admin');
+  };
+
+  function initOwnerPortal() {
+    // Owner tab navigation
+    document.querySelectorAll('.owner-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.owner-tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const tab = btn.dataset.ownerTab;
+        const subSections = document.querySelectorAll('.owner-sub-section');
+        subSections.forEach(s => s.classList.add('hidden'));
+
+        if (tab === 'inbox') {
+          const s = document.getElementById('owner-section-inbox');
+          if (s) s.classList.remove('hidden');
+        } else if (tab === 'events') {
+          const s = document.getElementById('owner-section-events');
+          if (s) s.classList.remove('hidden');
+        } else if (tab === 'grant') {
+          const s = document.getElementById('owner-section-grant');
+          if (s) s.classList.remove('hidden');
+        }
+      });
+    });
+
+    // Form: confirm rental approval modal
+    const formApprove = document.getElementById('form-confirm-rental-approval');
+    if (formApprove) {
+      formApprove.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const rentalId = document.getElementById('approve-rental-id').value;
+        const eventKey = document.getElementById('approve-event-key').value.trim().toUpperCase();
+        const allowedCounters = document.getElementById('approve-allowed-counters').value;
+        const expiresAtDate = document.getElementById('approve-expires-at').value;
+        const notes = document.getElementById('approve-notes').value.trim();
+
+        const expiresAt = new Date(expiresAtDate + 'T23:59:59.000Z').toISOString();
+
+        CS_Store.approveRental(rentalId, {
+          eventKey,
+          allowedCounters,
+          expiresAt,
+          notes
+        });
+
+        const modal = document.getElementById('modal-rental-approval');
+        if (modal) modal.classList.add('hidden');
+
+        if (typeof CS_Audio !== 'undefined' && CS_Audio.handshakeSuccess) CS_Audio.handshakeSuccess();
+        showToast(`Rental License Approved for ${eventKey}! Access Granted.`, 'success');
+        renderOwnerPortal();
+      });
+    }
+
+    // Form: direct manual grant
+    const formGrant = document.getElementById('form-owner-direct-grant');
+    if (formGrant) {
+      formGrant.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const hostEmail = document.getElementById('grant-host-email').value.trim();
+        const hostName = document.getElementById('grant-host-name').value.trim();
+        const organization = document.getElementById('grant-host-org').value.trim();
+        const eventName = document.getElementById('grant-event-name').value.trim();
+        const eventKey = document.getElementById('grant-event-key').value.trim().toUpperCase();
+        const allowedCounters = document.getElementById('grant-allowed-counters').value;
+        const expiresAtDate = document.getElementById('grant-expires-at').value;
+
+        const expiresAt = new Date(expiresAtDate + 'T23:59:59.000Z').toISOString();
+
+        const req = CS_Store.createRentalRequest({
+          hostEmail,
+          hostName,
+          organization,
+          eventName,
+          eventKey,
+          allowedCounters,
+          expiresAt
+        });
+
+        CS_Store.approveRental(req.id, {
+          eventKey,
+          allowedCounters,
+          expiresAt
+        });
+
+        formGrant.reset();
+        if (typeof CS_Audio !== 'undefined' && CS_Audio.handshakeSuccess) CS_Audio.handshakeSuccess();
+        showToast(`Direct Rental License Issued to ${hostEmail}!`, 'success');
+        
+        const tabEvents = document.getElementById('tab-btn-owner-events');
+        if (tabEvents) tabEvents.click();
+        renderOwnerPortal();
+      });
+    }
+
+    // Owner hero action buttons
+    const btnManualGrant = document.getElementById('btn-owner-manual-grant');
+    if (btnManualGrant) {
+      btnManualGrant.addEventListener('click', () => {
+        const tabGrant = document.getElementById('tab-btn-owner-grant');
+        if (tabGrant) tabGrant.click();
+      });
+    }
+
+    const btnSwitchCS2026 = document.getElementById('btn-owner-switch-cs2026');
+    if (btnSwitchCS2026) {
+      btnSwitchCS2026.addEventListener('click', () => {
+        state.eventKey = 'CS2026';
+        state.role = 'ADMIN';
+        navigateTo('admin');
+      });
+    }
+
+    const btnOwnerExit = document.getElementById('btn-owner-exit');
+    if (btnOwnerExit) {
+      btnOwnerExit.addEventListener('click', () => {
+        if (confirm('Exit Platform Owner Console and return to Brand Gateway?')) {
+          CS_Store.clearSession();
+          state.role = null;
+          state.currentUser = null;
+          navigateTo('landing');
+        }
+      });
+    }
+  }
+
+  // --- 6. Event Host Rental Application & Status Views ---
+  function initHostViews() {
+    const formReq = document.getElementById('form-host-rental-application');
+    if (formReq) {
+      formReq.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const user = state.currentUser || {};
+        const organization = document.getElementById('req-org-name').value.trim();
+        const phone = document.getElementById('req-phone').value.trim();
+        const eventName = document.getElementById('req-event-name').value.trim();
+        const eventKey = document.getElementById('req-event-key').value.trim().toUpperCase();
+        const startsAtDate = document.getElementById('req-start-date').value;
+        const endDateDate = document.getElementById('req-end-date').value;
+        const allowedCounters = document.getElementById('req-counter-count').value;
+        const bookTitle = document.getElementById('req-book-title').value.trim();
+        const unitPrice = document.getElementById('req-unit-price').value;
+        const notes = document.getElementById('req-notes').value.trim();
+
+        const startsAt = startsAtDate ? new Date(startsAtDate + 'T00:00:00.000Z').toISOString() : new Date().toISOString();
+        const expiresAt = endDateDate ? new Date(endDateDate + 'T23:59:59.000Z').toISOString() : new Date(Date.now() + 7 * 86400000).toISOString();
+
+        const rental = CS_Store.createRentalRequest({
+          hostEmail: user.email || 'host@festival.org',
+          hostName: user.displayName || 'Event Host',
+          organization,
+          phone,
+          eventName,
+          eventKey,
+          startsAt,
+          expiresAt,
+          allowedCounters,
+          bookTitle,
+          unitPrice,
+          notes
+        });
+
+        state.currentRental = rental;
+        if (typeof CS_Audio !== 'undefined' && CS_Audio.handshakeSuccess) CS_Audio.handshakeSuccess();
+        showToast('Rental application submitted! Awaiting review from safwanvgd313@gmail.com', 'success');
+        navigateTo('rental-status');
+      });
+    }
+
+    const btnCancelHostReq = document.getElementById('btn-cancel-host-request');
+    if (btnCancelHostReq) {
+      btnCancelHostReq.addEventListener('click', () => {
+        navigateTo('landing');
+      });
+    }
+
+    const btnRefreshStatus = document.getElementById('btn-refresh-rental-status');
+    if (btnRefreshStatus) {
+      btnRefreshStatus.addEventListener('click', () => {
+        const user = state.currentUser || (CS_Store.getSession() ? CS_Store.getSession().user : null);
+        if (!user || !user.email) {
+          navigateTo('landing');
+          return;
+        }
+        showToast('Checking latest approval status...', 'info');
+        const rental = CS_Store.getRentalByEmail(user.email);
+        if (rental) {
+          state.currentRental = rental;
+          if (rental.status === 'ACTIVE' && (!rental.expiresAt || new Date() <= new Date(rental.expiresAt))) {
+            showToast('Congratulations! Your rental license has been approved by Safwan.', 'success');
+            state.role = 'ADMIN';
+            state.eventKey = rental.eventKey;
+            CS_Store.setSession({ role: 'ADMIN', eventKey: rental.eventKey, user });
+            CS_Store.initCloudSync(rental.eventKey);
+            if (typeof CS_Audio !== 'undefined' && CS_Audio.handshakeSuccess) CS_Audio.handshakeSuccess();
+            navigateTo('admin');
+            return;
+          }
+        }
+        renderRentalStatusView();
+      });
+    }
+
+    const btnExitRentalStatus = document.getElementById('btn-exit-rental-status');
+    if (btnExitRentalStatus) {
+      btnExitRentalStatus.addEventListener('click', () => {
+        CS_Store.clearSession();
+        state.role = null;
+        state.currentUser = null;
+        navigateTo('landing');
+      });
+    }
+  }
+
+  function renderHostRequestView() {
+    const user = state.currentUser || {};
+    const avatarEl = document.getElementById('host-user-avatar');
+    const nameEl = document.getElementById('host-user-name');
+    const emailEl = document.getElementById('host-user-email');
+
+    if (avatarEl) {
+      const initial = (user.displayName || user.email || 'H').charAt(0).toUpperCase();
+      avatarEl.textContent = initial;
+    }
+    if (nameEl) nameEl.textContent = user.displayName || 'Event Organizer';
+    if (emailEl) emailEl.textContent = user.email || 'organizer@litfest.org';
+
+    const today = new Date();
+    const tomorrow = new Date(today.getTime() + 86400000).toISOString().split('T')[0];
+    const nextWeek = new Date(today.getTime() + 7 * 86400000).toISOString().split('T')[0];
+
+    const startInput = document.getElementById('req-start-date');
+    const endInput = document.getElementById('req-end-date');
+    if (startInput && !startInput.value) startInput.value = tomorrow;
+    if (endInput && !endInput.value) endInput.value = nextWeek;
+  }
+
+  function renderRentalStatusView() {
+    const rental = state.currentRental;
+    if (!rental) {
+      navigateTo('landing');
+      return;
+    }
+
+    const iconEl = document.getElementById('status-card-icon');
+    const titleEl = document.getElementById('status-card-title');
+    const descEl = document.getElementById('status-card-desc');
+    const detailsEl = document.getElementById('status-card-details');
+
+    const isExpired = rental.expiresAt && new Date() > new Date(rental.expiresAt);
+
+    if (rental.status === 'PENDING') {
+      if (iconEl) {
+        iconEl.className = 'status-hero-icon pending';
+        iconEl.textContent = '⏳';
+      }
+      if (titleEl) titleEl.textContent = 'Application Under Review';
+      if (descEl) descEl.textContent = `Your rental application for "${rental.eventName}" (${rental.eventKey}) has been submitted to Safwan (Platform Owner). You will be granted access as soon as your rental license is reviewed.`;
+    } else if (rental.status === 'ACTIVE' && isExpired) {
+      if (iconEl) {
+        iconEl.className = 'status-hero-icon expired';
+        iconEl.textContent = '🔴';
+      }
+      if (titleEl) titleEl.textContent = 'Rental License Concluded';
+      if (descEl) descEl.textContent = `The rental period for event "${rental.eventName}" (${rental.eventKey}) ended on ${new Date(rental.expiresAt).toLocaleDateString()}. Counter desks and admin consoles are currently locked. Contact Safwan to renew or extend.`;
+    } else if (rental.status === 'DENIED' || rental.status === 'SUSPENDED') {
+      if (iconEl) {
+        iconEl.className = 'status-hero-icon denied';
+        iconEl.textContent = '⛔';
+      }
+      if (titleEl) titleEl.textContent = rental.status === 'SUSPENDED' ? 'Access Suspended' : 'Application Not Approved';
+      if (descEl) descEl.textContent = rental.deniedReason || rental.suspendedReason || 'Access has been suspended by the platform administrator (safwanvgd313@gmail.com).';
+    }
+
+    if (detailsEl) {
+      detailsEl.innerHTML = `
+        <div class="rental-meta-cell">
+          <span class="rental-meta-title">Event Name</span>
+          <span class="rental-meta-val">${rental.eventName || 'Event'}</span>
+        </div>
+        <div class="rental-meta-cell">
+          <span class="rental-meta-title">Access Key</span>
+          <span class="rental-meta-val font-mono" style="color: #0066FF;">${rental.eventKey || 'TBD'}</span>
+        </div>
+        <div class="rental-meta-cell">
+          <span class="rental-meta-title">Rental Validity</span>
+          <span class="rental-meta-val">${rental.expiresAt ? new Date(rental.expiresAt).toLocaleDateString() : 'Pending Approval'}</span>
+        </div>
+        <div class="rental-meta-cell">
+          <span class="rental-meta-title">Counter Desks</span>
+          <span class="rental-meta-val">${rental.allowedCounters || 3} Desks</span>
+        </div>
+      `;
+    }
+  }
+
+  // Check URL hash for direct Platform Owner access
+  function checkUrlHashOwner() {
+    if (window.location.hash === '#owner') {
+      const session = CS_Store.getSession();
+      const user = state.currentUser || (session ? session.user : null);
+      if (user && CS_Store.isPlatformOwner(user.email)) {
+        navigateTo('owner-portal');
+      } else {
+        handleHostEventClick();
+      }
+    }
+  }
+
   // --- Real-time Local & Cross-Tab State Sync Listener ---
   CS_Store.subscribe((eventType, data) => {
     if (eventType === 'CLOUD_SYNC') {
@@ -3004,6 +3715,9 @@
         updateSyncIndicator('syncing', 'Syncing...');
         setTimeout(() => updateSyncIndicator('synced', 'Cloud Live'), 1000);
       }
+    } else if (eventType === 'RENTALS_SYNC') {
+      if (state.currentView === 'owner-portal') renderOwnerPortal();
+      if (state.currentView === 'rental-status') renderRentalStatusView();
     }
 
     if (state.currentView === 'pos') {
@@ -3012,6 +3726,8 @@
       renderStockRoomWorkspace();
     } else if (state.currentView === 'admin') {
       renderAdminDashboard();
+    } else if (state.currentView === 'owner-portal') {
+      renderOwnerPortal();
     }
   });
 
@@ -3052,18 +3768,42 @@
       initPOSWorkspace();
       initStockRoomWorkspace();
       initAdminDashboard();
+      initOwnerPortal();
+      initHostViews();
       initModals();
       registerServiceWorker();
+
+      // Triple tap logo on landing for direct owner login
+      let logoClicks = 0;
+      let logoTimer = null;
+      const landingLogo = document.querySelector('.landing-logo');
+      if (landingLogo) {
+        landingLogo.style.cursor = 'pointer';
+        landingLogo.addEventListener('click', () => {
+          logoClicks++;
+          clearTimeout(logoTimer);
+          logoTimer = setTimeout(() => { logoClicks = 0; }, 1500);
+          if (logoClicks >= 3) {
+            logoClicks = 0;
+            handleHostEventClick();
+          }
+        });
+      }
+
+      window.addEventListener('hashchange', checkUrlHashOwner);
 
       // Check if there was an active session
       const session = CS_Store.getSession();
       if (session && session.role && session.eventKey) {
         state.eventKey = session.eventKey;
         state.role = session.role;
+        state.currentUser = session.user || null;
         state.counterId = session.counterId || null;
         CS_Store.initCloudSync(session.eventKey);
 
-        if (session.role === 'POS' && state.counterId) {
+        if (session.role === 'OWNER' && CS_Store.isPlatformOwner(session.user && session.user.email)) {
+          navigateTo('owner-portal');
+        } else if (session.role === 'POS' && state.counterId) {
           navigateTo('pos');
         } else if (session.role === 'STOCKROOM') {
           navigateTo('stockroom');
@@ -3075,6 +3815,9 @@
       } else {
         navigateTo('landing');
       }
+
+      // Check URL hash (#owner)
+      checkUrlHashOwner();
     } catch (err) {
       console.error("CounterSync initialization error:", err);
     }

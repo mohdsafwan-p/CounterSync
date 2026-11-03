@@ -441,5 +441,44 @@ const CS_DEFAULT_SEED = {
         }
       ]
     }
+  },
+  
+  // Platform Owner & Multi-Tenant Rental Registry
+  platform: {
+    ownerEmail: "safwanvgd313@gmail.com",
+    rentals: [
+      {
+        id: "RENT-CS2026",
+        hostEmail: "safwanvgd313@gmail.com",
+        hostName: "Safwan (Platform Owner)",
+        organization: "CounterSync Core Team",
+        phone: "+91 98765 43210",
+        eventKey: "CS2026",
+        eventName: "Almuneer 2026",
+        status: "ACTIVE", // ACTIVE | PENDING | DENIED | SUSPENDED | EXPIRED
+        allowedCounters: 5,
+        startsAt: "2026-10-30T00:00:00.000Z",
+        expiresAt: "2027-12-31T23:59:59.000Z",
+        requestedAt: "2026-10-30T00:00:00.000Z",
+        approvedAt: "2026-10-30T00:00:00.000Z",
+        notes: "Master flagship exhibition event"
+      },
+      {
+        id: "RENT-REQ-101",
+        hostEmail: "rahul.organizer@keralalitfest.org",
+        hostName: "Rahul Menon",
+        organization: "Kerala Literature Festival Foundation",
+        phone: "+91 94471 23456",
+        eventKey: "KLF2026",
+        eventName: "Kerala Lit Fest 2026",
+        status: "PENDING",
+        allowedCounters: 4,
+        startsAt: "2026-11-10T00:00:00.000Z",
+        expiresAt: "2026-11-15T23:59:59.000Z",
+        requestedAt: "2026-11-03T10:30:00.000Z",
+        approvedAt: null,
+        notes: "Beach pavilion festival book counters"
+      }
+    ]
   }
 };

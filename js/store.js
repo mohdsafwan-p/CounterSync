@@ -47,6 +47,10 @@ class CounterSyncStore {
 
     try {
       const data = JSON.parse(raw);
+      if (!data.platform && typeof CS_DEFAULT_SEED !== 'undefined' && CS_DEFAULT_SEED.platform) {
+        data.platform = JSON.parse(JSON.stringify(CS_DEFAULT_SEED.platform));
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+      }
       if (data && data.events && data.events["CS2026"]) {
         const ev = data.events["CS2026"];
         ev.name = "Almuneer 2026";
@@ -103,6 +107,9 @@ class CounterSyncStore {
         if (eventData) {
           window.CS_Firebase.syncEventToCloud(activeKey, eventData);
         }
+        if (data.platform && data.platform.rentals) {
+          window.CS_Firebase.syncRentalsToCloud(data.platform.rentals);
+        }
       }
     } catch (err) {
       console.error("Failed to save store:", err);
@@ -120,6 +127,260 @@ class CounterSyncStore {
       this.updateEventFromCloud(key, cloudData);
       this._notifySubscribers('CLOUD_SYNC', { eventKey: key, hasPendingWrites });
     });
+
+    // Also listen to platform rental updates
+    this.initRentalsCloudSync();
+  }
+
+  initRentalsCloudSync() {
+    if (typeof window === 'undefined' || !window.CS_Firebase) return;
+    window.CS_Firebase.listenToRentals((cloudRentals) => {
+      if (!cloudRentals) return;
+      this.updateRentalsFromCloud(cloudRentals);
+      this._notifySubscribers('RENTALS_SYNC', cloudRentals);
+    });
+  }
+
+  updateRentalsFromCloud(cloudRentals) {
+    try {
+      const data = this.getData();
+      if (!data.platform) data.platform = {};
+      data.platform.rentals = cloudRentals;
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+      this._broadcast('SYNC', { timestamp: Date.now(), source: 'RENTALS_CLOUD' });
+    } catch (e) {
+      console.error("[CounterSync Store] Error merging cloud rentals:", e);
+    }
+  }
+
+  // --- SaaS Platform & Rental Management Methods ---
+  isPlatformOwner(email) {
+    if (!email) return false;
+    return String(email).toLowerCase().trim() === 'safwanvgd313@gmail.com';
+  }
+
+  getPlatformRentals() {
+    const data = this.getData();
+    if (!data.platform || !data.platform.rentals) {
+      if (typeof CS_DEFAULT_SEED !== 'undefined' && CS_DEFAULT_SEED.platform) {
+        data.platform = JSON.parse(JSON.stringify(CS_DEFAULT_SEED.platform));
+        this.saveData(data);
+      } else {
+        return [];
+      }
+    }
+    return data.platform.rentals || [];
+  }
+
+  getRentalByEmail(email) {
+    if (!email) return null;
+    const clean = String(email).toLowerCase().trim();
+    const rentals = this.getPlatformRentals();
+    return rentals.find(r => (r.hostEmail || '').toLowerCase().trim() === clean) || null;
+  }
+
+  getRentalByEventKey(eventKey) {
+    if (!eventKey) return null;
+    const clean = String(eventKey).toUpperCase().trim();
+    const rentals = this.getPlatformRentals();
+    return rentals.find(r => (r.eventKey || '').toUpperCase().trim() === clean) || null;
+  }
+
+  isEventLicenseValid(eventKey) {
+    if (!eventKey) return { valid: false, reason: 'No event key specified' };
+    const clean = String(eventKey).toUpperCase().trim();
+    const rental = this.getRentalByEventKey(clean);
+    
+    // Fallback for default demo event CS2026
+    if (!rental && clean === 'CS2026') {
+      return { valid: true, status: 'ACTIVE' };
+    }
+    
+    if (!rental) {
+      return { valid: false, status: 'NOT_FOUND', reason: `No rental license registered for event ${clean}` };
+    }
+
+    if (rental.status !== 'ACTIVE') {
+      return { valid: false, status: rental.status, reason: `Rental license is ${rental.status.toLowerCase()}` };
+    }
+
+    if (rental.expiresAt) {
+      const expiry = new Date(rental.expiresAt);
+      if (new Date() > expiry) {
+        return { valid: false, status: 'EXPIRED', reason: `Rental period concluded on ${expiry.toLocaleDateString()}` };
+      }
+    }
+
+    return { valid: true, status: 'ACTIVE', rental };
+  }
+
+  createRentalRequest(requestData) {
+    const data = this.getData();
+    if (!data.platform) data.platform = { ownerEmail: 'safwanvgd313@gmail.com', rentals: [] };
+    if (!data.platform.rentals) data.platform.rentals = [];
+
+    const cleanEmail = (requestData.hostEmail || '').toLowerCase().trim();
+    const cleanKey = (requestData.eventKey || ('EVT-' + Math.floor(1000 + Math.random() * 9000))).toUpperCase().trim();
+
+    const existingIndex = data.platform.rentals.findIndex(r => (r.hostEmail || '').toLowerCase().trim() === cleanEmail);
+
+    const rentalRecord = {
+      id: existingIndex >= 0 ? data.platform.rentals[existingIndex].id : ('RENT-' + Date.now()),
+      hostEmail: cleanEmail,
+      hostName: requestData.hostName || 'Event Host',
+      organization: requestData.organization || 'Independent Organizer',
+      phone: requestData.phone || '',
+      eventKey: cleanKey,
+      eventName: requestData.eventName || 'Festival Book Fair',
+      status: 'PENDING',
+      allowedCounters: parseInt(requestData.allowedCounters || 3, 10),
+      startsAt: requestData.startsAt || new Date().toISOString(),
+      expiresAt: requestData.expiresAt || new Date(Date.now() + 7 * 86400000).toISOString(),
+      requestedAt: new Date().toISOString(),
+      approvedAt: null,
+      notes: requestData.notes || '',
+      bookTitle: requestData.bookTitle || 'Festival Edition Publication',
+      unitPrice: parseFloat(requestData.unitPrice || 100)
+    };
+
+    if (existingIndex >= 0) {
+      data.platform.rentals[existingIndex] = rentalRecord;
+    } else {
+      data.platform.rentals.unshift(rentalRecord);
+    }
+
+    // Scaffold pending event if not present
+    if (!data.events[cleanKey]) {
+      data.events[cleanKey] = {
+        key: cleanKey,
+        name: rentalRecord.eventName,
+        bookTitle: rentalRecord.bookTitle,
+        unitPrice: rentalRecord.unitPrice,
+        adminPin: '9999',
+        stockRoomPin: '5555',
+        createdAt: new Date().toISOString(),
+        stockRoom: {
+          totalPressInflow: 1000,
+          vaultReserve: 1000,
+          keeperName: 'Logistics Squad',
+          corrections: [],
+          vaultGiveaways: []
+        },
+        counters: Array.from({ length: rentalRecord.allowedCounters }).map((_, i) => ({
+          id: `counter-${String(i + 1).padStart(2, '0')}a`,
+          name: `Counter ${String(i + 1).padStart(2, '0')}A`,
+          pin: `${1101 + i * 100}`,
+          volunteers: `Staff Desk ${i + 1}`,
+          upiId: `pay.${cleanKey.toLowerCase()}@bank`,
+          upiName: `${rentalRecord.eventName} Desk ${i + 1}`,
+          initialStock: 100,
+          currentStock: 100,
+          notes: `Sales desk ${i + 1}`,
+          lowStockAlert: false
+        })),
+        dispatches: [],
+        preorders: [],
+        transactions: [],
+        donations: [],
+        transfers: []
+      };
+    }
+
+    this.saveData(data);
+    return rentalRecord;
+  }
+
+  approveRental(rentalId, options = {}) {
+    const data = this.getData();
+    if (!data.platform || !data.platform.rentals) return null;
+
+    const rental = data.platform.rentals.find(r => r.id === rentalId);
+    if (!rental) return null;
+
+    rental.status = 'ACTIVE';
+    rental.approvedAt = new Date().toISOString();
+    if (options.expiresAt) rental.expiresAt = options.expiresAt;
+    if (options.allowedCounters) rental.allowedCounters = parseInt(options.allowedCounters, 10);
+    if (options.eventKey) rental.eventKey = options.eventKey.toUpperCase().trim();
+    if (options.notes) rental.notes = options.notes;
+
+    const key = rental.eventKey;
+    if (!data.events[key]) {
+      data.events[key] = {
+        key: key,
+        name: rental.eventName,
+        bookTitle: rental.bookTitle || 'Festival Commemorative Book',
+        unitPrice: rental.unitPrice || 100,
+        adminPin: '9999',
+        stockRoomPin: '5555',
+        createdAt: new Date().toISOString(),
+        stockRoom: {
+          totalPressInflow: 1000,
+          vaultReserve: 1000,
+          keeperName: 'Logistics Officer',
+          corrections: [],
+          vaultGiveaways: []
+        },
+        counters: Array.from({ length: rental.allowedCounters || 3 }).map((_, i) => ({
+          id: `counter-${String(i + 1).padStart(2, '0')}a`,
+          name: `Counter ${String(i + 1).padStart(2, '0')}A`,
+          pin: `${1101 + i * 100}`,
+          volunteers: `Staff Desk ${i + 1}`,
+          upiId: `pay.${key.toLowerCase()}@bank`,
+          upiName: `${rental.eventName} Desk ${i + 1}`,
+          initialStock: 100,
+          currentStock: 100,
+          notes: `Sales Counter ${i + 1}`,
+          lowStockAlert: false
+        })),
+        dispatches: [],
+        preorders: [],
+        transactions: [],
+        donations: [],
+        transfers: []
+      };
+    }
+
+    this.saveData(data);
+    return rental;
+  }
+
+  denyRental(rentalId, reason = 'Rental rejected by platform administrator') {
+    const data = this.getData();
+    if (!data.platform || !data.platform.rentals) return null;
+    const rental = data.platform.rentals.find(r => r.id === rentalId);
+    if (!rental) return null;
+
+    rental.status = 'DENIED';
+    rental.deniedReason = reason;
+    rental.deniedAt = new Date().toISOString();
+    this.saveData(data);
+    return rental;
+  }
+
+  suspendRental(rentalId, reason = 'Rental period concluded or revoked') {
+    const data = this.getData();
+    if (!data.platform || !data.platform.rentals) return null;
+    const rental = data.platform.rentals.find(r => r.id === rentalId);
+    if (!rental) return null;
+
+    rental.status = 'SUSPENDED';
+    rental.suspendedReason = reason;
+    rental.suspendedAt = new Date().toISOString();
+    this.saveData(data);
+    return rental;
+  }
+
+  extendRental(rentalId, newExpiresAt) {
+    const data = this.getData();
+    if (!data.platform || !data.platform.rentals) return null;
+    const rental = data.platform.rentals.find(r => r.id === rentalId);
+    if (!rental) return null;
+
+    rental.expiresAt = newExpiresAt;
+    rental.status = 'ACTIVE';
+    this.saveData(data);
+    return rental;
   }
 
   updateEventFromCloud(eventKey, cloudData) {

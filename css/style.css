@@ -2159,6 +2159,12 @@ button, input, select, textarea, .intent-card, .btn-qty-card, .btn-pay-mode, .do
   textarea {
     font-size: 16px !important;
   }
+
+  /* Mobile & Tablet Header: Completely remove lock countdown and lock button */
+  #idle-timer-display,
+  #btn-quick-lock {
+    display: none !important;
+  }
 }
 
 /* Mobile Screen Breakpoint: ≤ 640px */
@@ -2166,34 +2172,84 @@ button, input, select, textarea, .intent-card, .btn-qty-card, .btn-pay-mode, .do
   /* 1. Mobile Header */
   #app-header {
     height: 56px;
-    padding: 0 12px;
-  }
-
-  .header-brand {
+    padding: 0 10px;
     gap: 8px;
   }
 
+  .header-brand {
+    gap: 6px;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
   .header-brand img, .header-brand svg {
-    width: 30px !important;
-    height: 30px !important;
+    width: 28px !important;
+    height: 28px !important;
     border-radius: 7px !important;
   }
 
   .brand-title {
-    font-size: 0.95rem;
+    font-size: 0.90rem;
+    white-space: nowrap;
   }
 
   .header-event-badge {
-    padding: 4px 8px;
-    font-size: 0.72rem;
-    max-width: 130px;
+    padding: 3px 6px;
+    font-size: 0.68rem;
+    max-width: 95px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
   .header-actions {
-    gap: 5px;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Explicitly remove lock timer countdown and Lock button from mobile devices */
+  #idle-timer-display,
+  #btn-quick-lock {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Ensure Logout button and Light/Dark switch button are prominently visible and sized */
+  .header-round-btn {
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    border-radius: 9px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+  }
+
+  #btn-theme-toggle,
+  #btn-header-logout {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    flex-shrink: 0 !important;
+  }
+
+  .btn-exit-box svg {
+    width: 17px !important;
+    height: 17px !important;
+  }
+
+  .synced-status-pill {
+    padding: 3px 7px !important;
+    font-size: 0.70rem !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
   }
 
   .icon-btn {
@@ -2206,11 +2262,6 @@ button, input, select, textarea, .intent-card, .btn-qty-card, .btn-pay-mode, .do
   .btn-pill {
     padding: 5px 10px;
     font-size: 0.76rem;
-  }
-
-  .idle-timer-badge {
-    font-size: 0.7rem;
-    padding: 3px 7px;
   }
 
   /* 2. Main Viewport Padding */
@@ -4171,4 +4222,288 @@ body:not(.light-theme) .transfer-banner-info p {
 body:not(.light-theme) .policy-radio-card.active {
   background: rgba(0, 102, 255, 0.12);
   border-color: #3B82F6;
+}
+
+/* ==========================================================================
+   CounterSync SaaS Rental & Platform Owner Portal Styling
+   ========================================================================== */
+
+.view-owner-portal {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 16px 12px 84px;
+}
+
+.owner-hero-banner {
+  background: linear-gradient(135deg, #070B19 0%, #0B132B 50%, #172554 100%);
+  border: 1.5px solid rgba(59, 130, 246, 0.3);
+  border-radius: 24px;
+  padding: 24px 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 12px 36px rgba(0, 102, 255, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+.owner-hero-banner::after {
+  content: "";
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(0, 102, 255, 0.35) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.owner-badge-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10B981;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.owner-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 900px) {
+  .owner-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .owner-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.owner-kpi-card {
+  background: var(--bg-surface-elevated);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+
+.owner-kpi-card:hover {
+  transform: translateY(-2px);
+  border-color: #0066FF;
+}
+
+.owner-kpi-val {
+  font-size: 1.8rem;
+  font-weight: 900;
+  line-height: 1.1;
+  margin-bottom: 4px;
+  font-family: var(--font-mono);
+}
+
+.owner-kpi-label {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.owner-tab-nav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1.5px solid var(--border-subtle);
+  padding-bottom: 8px;
+  overflow-x: auto;
+}
+
+.owner-tab-btn {
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.86rem;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.owner-tab-btn.active {
+  background: #0066FF;
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px rgba(0, 102, 255, 0.35);
+}
+
+.rental-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.rental-badge.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10B981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.rental-badge.pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #F59E0B;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.rental-badge.denied,
+.rental-badge.suspended {
+  background: rgba(239, 68, 68, 0.15);
+  color: #EF4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.rental-badge.expired {
+  background: rgba(100, 116, 139, 0.15);
+  color: #94A3B8;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
+.rental-item-card {
+  background: var(--bg-surface-elevated);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 20px;
+  padding: 18px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+
+.rental-item-card:hover {
+  border-color: rgba(0, 102, 255, 0.4);
+}
+
+.rental-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.rental-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+}
+
+.rental-meta-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+.rental-meta-title {
+  font-size: 0.70rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.rental-meta-val {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 2px;
+}
+
+.rental-actions-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Host Request Screen Styling */
+.view-host-request {
+  max-width: 660px;
+  margin: 0 auto;
+  padding: 16px 12px 84px;
+}
+
+.host-request-card {
+  background: var(--bg-surface-elevated);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 24px;
+  padding: 24px 20px;
+  box-shadow: var(--shadow-md);
+}
+
+/* Rental Status Screen Styling */
+.view-rental-status {
+  max-width: 580px;
+  margin: 0 auto;
+  padding: 24px 14px 84px;
+}
+
+.rental-status-card {
+  background: var(--bg-surface-elevated);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 24px;
+  padding: 32px 22px;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+
+.status-hero-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  margin: 0 auto 16px;
+}
+
+.status-hero-icon.pending {
+  background: rgba(245, 158, 11, 0.12);
+  border: 2px solid rgba(245, 158, 11, 0.35);
+}
+
+.status-hero-icon.active {
+  background: rgba(16, 185, 129, 0.12);
+  border: 2px solid rgba(16, 185, 129, 0.35);
+}
+
+.status-hero-icon.denied,
+.status-hero-icon.expired {
+  background: rgba(239, 68, 68, 0.12);
+  border: 2px solid rgba(239, 68, 68, 0.35);
 }

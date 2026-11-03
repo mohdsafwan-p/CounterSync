@@ -22,7 +22,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800;900&family=Manjari:wght@400;700&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- Bulletproof Standalone CSS -->
-  <link rel="stylesheet" href="./css/style.css?v=15">
+  <link rel="stylesheet" href="./css/style.css?v=16">
 </head>
 <body>
   <div id="app">
@@ -1073,6 +1073,279 @@
           </table>
         </div>
       </section>
+
+      <!-- 5. Platform Owner Portal (Safwan Exclusive Console) -->
+      <section id="view-owner-portal" class="view-owner-portal hidden">
+        <div class="owner-hero-banner">
+          <div class="owner-badge-verified">👑 Verified Platform Owner</div>
+          <h1 style="font-size: 1.8rem; font-weight: 900; margin-bottom: 6px; color: #FFFFFF;">
+            Platform Owner Portal
+          </h1>
+          <p style="color: #94A3B8; font-size: 0.92rem; margin-bottom: 18px; max-width: 650px;">
+            SaaS Fleet Control Console. Review event rental requests, grant or revoke host access licenses, and monitor live sales performance across all festival events.
+          </p>
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <div style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px; padding: 6px 14px; font-size: 0.82rem; font-weight: 700; color: #E2E8F0;">
+              Account: <span style="color: #60A5FA;">safwanvgd313@gmail.com</span>
+            </div>
+            <button id="btn-owner-manual-grant" class="btn-pill btn-pill-primary" style="font-size: 0.82rem; padding: 7px 14px;">
+              + Pre-Approve Host
+            </button>
+            <button id="btn-owner-switch-cs2026" class="btn-pill btn-pill-subtle" style="font-size: 0.82rem; padding: 7px 14px;">
+              👁️ View Almuneer CS2026
+            </button>
+            <button id="btn-owner-exit" class="btn-pill" style="font-size: 0.82rem; padding: 7px 14px; background: rgba(239, 68, 68, 0.15); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.3);">
+              Exit Console
+            </button>
+          </div>
+        </div>
+
+        <!-- Platform High-Level KPI Grid -->
+        <div class="owner-kpi-grid">
+          <div class="owner-kpi-card" style="border-left: 4px solid #F59E0B;">
+            <div class="owner-kpi-label">Pending Requests</div>
+            <div class="owner-kpi-val" id="owner-kpi-pending" style="color: #F59E0B;">0</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">Awaiting review & approval</div>
+          </div>
+          <div class="owner-kpi-card" style="border-left: 4px solid #10B981;">
+            <div class="owner-kpi-label">Active Event Licenses</div>
+            <div class="owner-kpi-val" id="owner-kpi-active" style="color: #10B981;">0</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">Live on festival field</div>
+          </div>
+          <div class="owner-kpi-card" style="border-left: 4px solid #0066FF;">
+            <div class="owner-kpi-label">Total Fleet Books Sold</div>
+            <div class="owner-kpi-val" id="owner-kpi-sold" style="color: #0066FF;">0</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">Copies across all events</div>
+          </div>
+          <div class="owner-kpi-card" style="border-left: 4px solid #8B5CF6;">
+            <div class="owner-kpi-label">Total Fleet Revenue</div>
+            <div class="owner-kpi-val" id="owner-kpi-revenue" style="color: #8B5CF6;">₹0</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">Cumulative counter cash + UPI</div>
+          </div>
+        </div>
+
+        <!-- Owner Tabs -->
+        <div class="owner-tab-nav">
+          <button class="owner-tab-btn active" data-owner-tab="inbox" id="tab-btn-owner-inbox">
+            📥 Rental Applications <span id="owner-inbox-counter" style="background: rgba(255,255,255,0.2); border-radius: 9999px; padding: 2px 7px; font-size: 0.75rem; margin-left: 4px;">0</span>
+          </button>
+          <button class="owner-tab-btn" data-owner-tab="events" id="tab-btn-owner-events">
+            🎪 All Running Events (<span id="owner-events-counter">0</span>)
+          </button>
+          <button class="owner-tab-btn" data-owner-tab="grant" id="tab-btn-owner-grant">
+            ⚡ Direct License Grant
+          </button>
+        </div>
+
+        <!-- Section A: Rental Requests Inbox -->
+        <div id="owner-section-inbox" class="owner-sub-section">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <h3 style="font-size: 1.15rem; font-weight: 800;">Pending & Processed Host Applications</h3>
+            <span style="font-size: 0.78rem; color: var(--text-secondary);">Real-time review</span>
+          </div>
+          <div id="owner-rental-requests-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Section B: All Running Events -->
+        <div id="owner-section-events" class="owner-sub-section hidden">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <h3 style="font-size: 1.15rem; font-weight: 800;">Active Rented Events Fleet</h3>
+            <span style="font-size: 0.78rem; color: var(--text-secondary);">Direct Kill-Switch & License Extension</span>
+          </div>
+          <div id="owner-active-events-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Section C: Direct License Grant -->
+        <div id="owner-section-grant" class="owner-sub-section hidden">
+          <div class="rental-item-card" style="max-width: 650px;">
+            <h3 style="font-size: 1.15rem; font-weight: 800; margin-bottom: 4px;">Pre-Approve a New Host License</h3>
+            <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 18px;">
+              Directly grant rental access to an event host by their email address without requiring them to wait in queue.
+            </p>
+            <form id="form-owner-direct-grant">
+              <div class="form-group" style="margin-bottom: 12px;">
+                <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);">HOST GOOGLE EMAIL *</label>
+                <input type="email" id="grant-host-email" class="form-input" placeholder="organizer@literaturefest.org" required>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                <div class="form-group">
+                  <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);">HOST NAME *</label>
+                  <input type="text" id="grant-host-name" class="form-input" placeholder="e.g. Sreejith Varma" required>
+                </div>
+                <div class="form-group">
+                  <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);">ORGANIZATION *</label>
+                  <input type="text" id="grant-host-org" class="form-input" placeholder="e.g. Cochin Book Fair Society" required>
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                <div class="form-group">
+                  <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);">EVENT NAME *</label>
+                  <input type="text" id="grant-event-name" class="form-input" placeholder="e.g. Cochin Book Fest 2026" required>
+                </div>
+                <div class="form-group">
+                  <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);">ASSIGNED EVENT ACCESS KEY *</label>
+                  <input type="text" id="grant-event-key" class="form-input font-mono" placeholder="e.g. CBF2026" style="text-transform: uppercase;" required>
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+                <div class="form-group">
+                  <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);">ALLOWED COUNTERS</label>
+                  <select id="grant-allowed-counters" class="form-input">
+                    <option value="1">1 Counter</option>
+                    <option value="2">2 Counters</option>
+                    <option value="3" selected>3 Counters</option>
+                    <option value="5">5 Counters</option>
+                    <option value="8">8 Counters</option>
+                    <option value="10">10 Counters</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);">RENTAL EXPIRES ON *</label>
+                  <input type="date" id="grant-expires-at" class="form-input" required>
+                </div>
+              </div>
+              <button type="submit" class="btn-complete-sale" style="height: 48px; font-size: 0.95rem;">
+                Grant Instant Rental License ✓
+              </button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. Host Event Rental Application Screen (view-host-request) -->
+      <section id="view-host-request" class="view-host-request hidden">
+        <div class="host-request-card">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border-subtle);">
+            <div style="width: 44px; height: 44px; border-radius: 14px; background: rgba(0, 102, 255, 0.15); color: #0066FF; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+              🎪
+            </div>
+            <div>
+              <h2 style="font-size: 1.35rem; font-weight: 900; line-height: 1.2;">Host an Event Rental Request</h2>
+              <p style="font-size: 0.80rem; color: var(--text-secondary);">
+                Submit your event details. Safwan (Platform Owner) will review and activate your license.
+              </p>
+            </div>
+          </div>
+
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 10px 14px; margin-bottom: 18px; display: flex; align-items: center; gap: 10px;">
+            <div style="width: 32px; height: 32px; border-radius: 50%; background: #0066FF; color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.85rem;" id="host-user-avatar">
+              U
+            </div>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 700; font-size: 0.86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="host-user-name">Event Organizer</div>
+              <div style="font-size: 0.74rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="host-user-email">user@gmail.com</div>
+            </div>
+            <span style="font-size: 0.72rem; font-weight: 800; color: #10B981; background: rgba(16,185,129,0.12); padding: 3px 8px; border-radius: 9999px;">Google Verified ✓</span>
+          </div>
+
+          <form id="form-host-rental-application">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+              <div class="form-group">
+                <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary);">ORGANIZATION / PUBLISHER *</label>
+                <input type="text" id="req-org-name" class="form-input" placeholder="e.g. Green Books / Lit Fest Society" required>
+              </div>
+              <div class="form-group">
+                <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary);">WHATSAPP / PHONE NUMBER *</label>
+                <input type="tel" id="req-phone" class="form-input" placeholder="+91 98765 43210" required>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; margin-bottom: 12px;">
+              <div class="form-group">
+                <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary);">EVENT NAME *</label>
+                <input type="text" id="req-event-name" class="form-input" placeholder="e.g. Calicut Beach Lit Fest 2026" required>
+              </div>
+              <div class="form-group">
+                <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary);">DESIRED ACCESS KEY *</label>
+                <input type="text" id="req-event-key" class="form-input font-mono" placeholder="e.g. CBLF26" style="text-transform: uppercase;" required>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+              <div class="form-group">
+                <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary);">START DATE *</label>
+                <input type="date" id="req-start-date" class="form-input" required>
+              </div>
+              <div class="form-group">
+                <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary);">END DATE (DURATION) *</label>
+                <input type="date" id="req-end-date" class="form-input" required>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+              <div class="form-group">
+                <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary);">COUNTERS NEEDED</label>
+                <select id="req-counter-count" class="form-input">
+                  <option value="1">1 Counter</option>
+                  <option value="2">2 Counters</option>
+                  <option value="3" selected>3 Counters</option>
+                  <option value="4">4 Counters</option>
+                  <option value="5">5 Counters</option>
+                  <option value="8">8 Counters</option>
+                  <option value="10">10 Counters</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary);">BOOK TITLE</label>
+                <input type="text" id="req-book-title" class="form-input" placeholder="Festival Book Title">
+              </div>
+              <div class="form-group">
+                <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary);">PRICE (₹)</label>
+                <input type="number" id="req-unit-price" class="form-input" value="100" min="0">
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 18px;">
+              <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary);">SPECIAL NOTES / LOGISTICS REQUIREMENTS</label>
+              <textarea id="req-notes" class="form-input" rows="2" placeholder="Expected number of copies, press batches, or volunteer count..."></textarea>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+              <button type="submit" class="btn-complete-sale" style="flex: 2; height: 48px; font-size: 0.95rem;">
+                Submit Application for Review →
+              </button>
+              <button type="button" id="btn-cancel-host-request" class="btn-pill btn-pill-subtle" style="flex: 1; height: 48px;">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- 7. Host License Status & Renewal Screen (view-rental-status) -->
+      <section id="view-rental-status" class="view-rental-status hidden">
+        <div class="rental-status-card">
+          <div id="status-card-icon" class="status-hero-icon pending">
+            ⏳
+          </div>
+          <h2 id="status-card-title" style="font-size: 1.5rem; font-weight: 900; margin-bottom: 8px;">
+            Application Under Review
+          </h2>
+          <p id="status-card-desc" style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 22px; line-height: 1.5;">
+            Your event rental request has been submitted to Safwan (Platform Owner). Once reviewed and granted, your account will be activated with full administrative access.
+          </p>
+
+          <div id="status-card-details" class="rental-meta-grid" style="text-align: left; margin-bottom: 24px;">
+            <!-- Dynamically populated -->
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <button id="btn-refresh-rental-status" class="btn-complete-sale" style="height: 46px; font-size: 0.95rem;">
+              🔄 Refresh / Check Approval Status
+            </button>
+            <a id="btn-contact-owner-email" href="mailto:safwanvgd313@gmail.com?subject=CounterSync%20Event%20Rental%20Inquiry" class="btn-pill btn-pill-subtle" style="display: flex; align-items: center; justify-content: center; height: 42px; text-decoration: none; font-weight: 700;">
+              ✉️ Contact Platform Owner (safwanvgd313@gmail.com)
+            </a>
+            <button id="btn-exit-rental-status" class="btn-pill" style="height: 40px; background: transparent; color: var(--text-muted); border: 1px solid var(--border-subtle);">
+              Sign Out / Return to Gateway
+            </button>
+          </div>
+        </div>
+      </section>
     </main>
 
     <!-- Modals Container -->
@@ -1525,9 +1798,9 @@
       </div>
     </div>
 
-    <!-- 6. Google Sign-In Simulation Modal -->
+    <!-- 6. Google Sign-In Modal (Multi-Tenant & Platform Owner Hook) -->
     <div id="modal-google-auth" class="modal-overlay hidden">
-      <div class="modal-content" style="max-width: 400px; text-align: center;">
+      <div class="modal-content" style="max-width: 440px; text-align: center;">
         <svg width="44" height="44" viewBox="0 0 24 24" style="margin-bottom: 12px;">
           <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
           <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.36 24 12 24z"/>
@@ -1535,24 +1808,118 @@
           <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.36 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
         </svg>
         <h3 style="margin-bottom: 6px;">Sign in with Google</h3>
-        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px;">
-          CounterSync Multi-Tenant SaaS Authorization Hook
+        <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 16px;">
+          Select account or enter email to authenticate with CounterSync
         </p>
 
-        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px; display: flex; align-items: center; gap: 12px; margin-bottom: 20px; text-align: left; cursor: pointer;" id="google-profile-select">
-          <div style="width: 40px; height: 40px; border-radius: 50%; background: #0066FF; color: white; display: flex; align-items: center; justify-content: center; font-weight: 800;">
-            SA
+        <!-- Profile 1: Safwan (Platform Owner) -->
+        <div style="background: var(--bg-surface-elevated); border: 1.5px solid rgba(0, 102, 255, 0.4); border-radius: var(--radius-md); padding: 10px 12px; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; text-align: left; cursor: pointer;" class="demo-auth-pill" onclick="window.selectDemoGoogleProfile('safwanvgd313@gmail.com', 'Safwan')">
+          <div style="width: 36px; height: 36px; border-radius: 50%; background: #0066FF; color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.9rem;">
+            👑
           </div>
-          <div style="flex: 1;">
-            <div style="font-weight: 700; font-size: 0.95rem;">Safwan (Festival Director)</div>
-            <div style="font-size: 0.78rem; color: var(--text-secondary);">safwan.organizer@countersync.io</div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 800; font-size: 0.88rem; color: var(--text-primary);">Safwan (Platform Owner)</div>
+            <div style="font-size: 0.74rem; color: #0066FF; font-weight: 600;">safwanvgd313@gmail.com</div>
           </div>
-          <span style="color: var(--color-emerald); font-weight: 700;">✓</span>
+          <span style="font-size: 0.72rem; font-weight: 800; background: rgba(0,102,255,0.12); color: #0066FF; padding: 2px 7px; border-radius: 9999px;">Owner</span>
         </div>
 
-        <button id="btn-confirm-google-login" class="btn-complete-sale" style="height: 48px; font-size: 1rem;">
-          Authorize as Super Admin
+        <!-- Profile 2: Existing Host (Kerala Lit Fest) -->
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 10px 12px; display: flex; align-items: center; gap: 10px; margin-bottom: 8px; text-align: left; cursor: pointer;" class="demo-auth-pill" onclick="window.selectDemoGoogleProfile('rahul.organizer@keralalitfest.org', 'Rahul Menon')">
+          <div style="width: 36px; height: 36px; border-radius: 50%; background: #10B981; color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.85rem;">
+            RM
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 700; font-size: 0.88rem;">Rahul Menon (Kerala Lit Fest)</div>
+            <div style="font-size: 0.74rem; color: var(--text-secondary);">rahul.organizer@keralalitfest.org</div>
+          </div>
+          <span style="font-size: 0.72rem; font-weight: 700; background: rgba(245,158,11,0.12); color: #F59E0B; padding: 2px 7px; border-radius: 9999px;">Pending Host</span>
+        </div>
+
+        <!-- Profile 3: New Applicant -->
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 10px 12px; display: flex; align-items: center; gap: 10px; margin-bottom: 14px; text-align: left; cursor: pointer;" class="demo-auth-pill" onclick="window.selectDemoGoogleProfile('ananya.host@mumbaibookfair.in', 'Ananya Sharma')">
+          <div style="width: 36px; height: 36px; border-radius: 50%; background: #8B5CF6; color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.85rem;">
+            AS
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 700; font-size: 0.88rem;">Ananya Sharma (New Host)</div>
+            <div style="font-size: 0.74rem; color: var(--text-secondary);">ananya.host@mumbaibookfair.in</div>
+          </div>
+          <span style="font-size: 0.72rem; font-weight: 700; background: rgba(59,130,246,0.12); color: #3B82F6; padding: 2px 7px; border-radius: 9999px;">New Rental</span>
+        </div>
+
+        <div style="margin-bottom: 14px; text-align: left;">
+          <label style="font-size: 0.72rem; font-weight: 700; color: var(--text-secondary);">OR ENTER ANY CUSTOM GOOGLE EMAIL:</label>
+          <input type="email" id="custom-google-email-input" class="form-input" placeholder="your.name@gmail.com" style="margin-top: 4px;">
+        </div>
+
+        <button id="btn-confirm-google-login" class="btn-complete-sale" style="height: 46px; font-size: 0.95rem; margin-bottom: 8px;">
+          Continue with Selected Account →
         </button>
+        <button type="button" class="btn-pill" style="width: 100%; height: 36px; background: transparent; color: var(--text-muted); border: 1px solid var(--border-subtle);" onclick="document.getElementById('modal-google-auth').classList.add('hidden')">
+          Cancel
+        </button>
+      </div>
+    </div>
+
+    <!-- 7. Platform Owner Rental Approval Modal -->
+    <div id="modal-rental-approval" class="modal-overlay hidden">
+      <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+          <h3>👑 Grant Event Rental License</h3>
+          <button class="modal-close-btn" data-close-modal="modal-rental-approval">✕</button>
+        </div>
+        <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 16px;">
+          Review and activate rental access for this host. Set authorized event key and rental expiration.
+        </p>
+
+        <form id="form-confirm-rental-approval">
+          <input type="hidden" id="approve-rental-id">
+          <div style="background: var(--bg-surface); padding: 12px; border-radius: 12px; border: 1px solid var(--border-subtle); margin-bottom: 14px;">
+            <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Host Applicant</div>
+            <div style="font-weight: 800; font-size: 0.98rem;" id="approve-host-name-display">Host Name</div>
+            <div style="font-size: 0.82rem; color: #0066FF; font-weight: 600;" id="approve-host-email-display">email@org.com</div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+            <div class="form-group">
+              <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary);">CONFIRM EVENT KEY *</label>
+              <input type="text" id="approve-event-key" class="form-input font-mono" style="text-transform: uppercase;" required>
+            </div>
+            <div class="form-group">
+              <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary);">ALLOWED COUNTERS *</label>
+              <select id="approve-allowed-counters" class="form-input">
+                <option value="1">1 Counter</option>
+                <option value="2">2 Counters</option>
+                <option value="3">3 Counters</option>
+                <option value="4">4 Counters</option>
+                <option value="5" selected>5 Counters</option>
+                <option value="8">8 Counters</option>
+                <option value="10">10 Counters</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary);">RENTAL EXPIRES ON (EXPIRATION DATE) *</label>
+            <input type="date" id="approve-expires-at" class="form-input" required>
+            <div style="display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;">
+              <button type="button" class="btn-pill btn-pill-subtle" style="font-size: 0.72rem; padding: 3px 8px;" onclick="window.setApprovalPresetDays(3)">+3 Days</button>
+              <button type="button" class="btn-pill btn-pill-subtle" style="font-size: 0.72rem; padding: 3px 8px;" onclick="window.setApprovalPresetDays(7)">+7 Days</button>
+              <button type="button" class="btn-pill btn-pill-subtle" style="font-size: 0.72rem; padding: 3px 8px;" onclick="window.setApprovalPresetDays(30)">+30 Days</button>
+              <button type="button" class="btn-pill btn-pill-subtle" style="font-size: 0.72rem; padding: 3px 8px;" onclick="window.setApprovalPresetDays(365)">+1 Year</button>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 18px;">
+            <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary);">APPROVAL NOTES / TERMS</label>
+            <input type="text" id="approve-notes" class="form-input" placeholder="e.g. Standard festival license approved">
+          </div>
+
+          <button type="submit" class="btn-complete-sale" style="height: 48px; font-size: 0.98rem;">
+            Approve & Issue Rental License ✓
+          </button>
+        </form>
       </div>
     </div>
 
@@ -1585,10 +1952,10 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-  <script src="./js/firebase-config.js?v=15"></script>
-  <script src="./js/qrcode.js?v=15"></script>
-  <script src="./js/seed.js?v=15"></script>
-  <script src="./js/store.js?v=15"></script>
-  <script src="./js/app.js?v=15"></script>
+  <script src="./js/firebase-config.js?v=16"></script>
+  <script src="./js/qrcode.js?v=16"></script>
+  <script src="./js/seed.js?v=16"></script>
+  <script src="./js/store.js?v=16"></script>
+  <script src="./js/app.js?v=16"></script>
 </body>
 </html>
