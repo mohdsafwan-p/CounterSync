@@ -130,19 +130,57 @@
     // --- Google Authentication ---
     async signInWithGoogle() {
       if (!isInitialized || !auth) {
-        throw new Error("Firebase Authentication is not initialized. Please configure your Firebase API Key in js/firebase-config.js.");
+        throw new Error("Firebase Authentication is not initialized.");
       }
 
       const provider = new firebase.auth.GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
 
+      // Detect mobile browsers or webviews where popups are blocked or fail
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+      if (isMobile) {
+        try {
+          sessionStorage.setItem('cs_auth_redirect_in_progress', 'true');
+          await auth.signInWithRedirect(provider);
+          return null;
+        } catch (err) {
+          sessionStorage.removeItem('cs_auth_redirect_in_progress');
+          if (err.code === 'auth/unauthorized-domain') {
+            const domain = window.location.hostname;
+            throw new Error(`Domain "${domain}" is not authorized. In Firebase Console -> Authentication -> Settings -> Authorized domains, add "${domain}".`);
+          }
+          throw err;
+        }
+      }
+
       try {
         const result = await auth.signInWithPopup(provider);
         return result.user;
       } catch (err) {
-        if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
-          console.warn("Popup blocked or closed, falling back to redirect flow...");
-          return auth.signInWithRedirect(provider);
+        if (err.code === 'auth/unauthorized-domain') {
+          const domain = window.location.hostname;
+          throw new Error(`Domain "${domain}" is not authorized. In Firebase Console -> Authentication -> Settings -> Authorized domains, add "${domain}".`);
+        }
+        if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+          console.warn("[CounterSync Firebase] Popup blocked or closed, falling back to redirect flow...");
+          sessionStorage.setItem('cs_auth_redirect_in_progress', 'true');
+          await auth.signInWithRedirect(provider);
+          return null;
+        }
+        throw err;
+      }
+    },
+
+    async getRedirectResult() {
+      if (!isInitialized || !auth) return null;
+      try {
+        const result = await auth.getRedirectResult();
+        return result && result.user ? result.user : null;
+      } catch (err) {
+        if (err.code === 'auth/unauthorized-domain') {
+          const domain = window.location.hostname;
+          throw new Error(`Domain "${domain}" is not authorized. In Firebase Console -> Authentication -> Settings -> Authorized domains, add "${domain}".`);
         }
         throw err;
       }

@@ -708,9 +708,14 @@
             await handleAuthenticatedUser(user);
             return;
           }
+          // If user is null, full-page redirect is currently navigating to Google
+          if (sessionStorage.getItem('cs_auth_redirect_in_progress') === 'true') {
+            return;
+          }
         } catch (err) {
           console.warn("Google Sign-In notice:", err);
-          showToast(err.message || 'Google Sign-In canceled', 'error');
+          showToast(err.message || 'Google Sign-In canceled', 'error', 8000);
+          return;
         }
       }
       const modal = document.getElementById('modal-google-auth');
@@ -3759,6 +3764,51 @@
     }
   }
 
+  // --- Firebase Google Auth & Redirect Result Listener ---
+  async function initFirebaseAuthListener() {
+    if (typeof window === 'undefined' || !window.CS_Firebase) return;
+
+    // Check if returning from Google redirect
+    const wasRedirecting = sessionStorage.getItem('cs_auth_redirect_in_progress') === 'true';
+    if (wasRedirecting) {
+      sessionStorage.removeItem('cs_auth_redirect_in_progress');
+      if (typeof showToast === 'function') {
+        showToast('Completing Google authentication...', 'info');
+      }
+    }
+
+    // 1. Process Google Sign-In redirect result
+    try {
+      if (typeof window.CS_Firebase.getRedirectResult === 'function') {
+        const redirectUser = await window.CS_Firebase.getRedirectResult();
+        if (redirectUser) {
+          if (typeof showToast === 'function') {
+            showToast(`Signed in as ${redirectUser.displayName || redirectUser.email}`, 'success');
+          }
+          await handleAuthenticatedUser(redirectUser);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("[CounterSync Auth] Redirect auth error:", err);
+      if (typeof showToast === 'function') {
+        showToast(err.message, 'error', 9000);
+      }
+    }
+
+    // 2. Real-time Firebase Auth state observer
+    if (typeof window.CS_Firebase.onAuthStateChanged === 'function') {
+      window.CS_Firebase.onAuthStateChanged(async (firebaseUser) => {
+        if (firebaseUser) {
+          const session = CS_Store.getSession();
+          if (!session || !session.role || state.currentView === 'landing' || wasRedirecting) {
+            await handleAuthenticatedUser(firebaseUser);
+          }
+        }
+      });
+    }
+  }
+
   // --- App Initialization Bootstrapper ---
   function init() {
     try {
@@ -3772,6 +3822,9 @@
       initHostViews();
       initModals();
       registerServiceWorker();
+
+      // Hook Firebase authentication redirect & state listeners
+      initFirebaseAuthListener();
 
       // Triple tap logo on landing for direct owner login
       let logoClicks = 0;
