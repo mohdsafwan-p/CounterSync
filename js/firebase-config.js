@@ -70,6 +70,13 @@
       auth = firebase.auth();
       db = firebase.firestore();
 
+      // Ensure persistent local authentication session across restarts
+      if (auth && firebase.auth && firebase.auth.Auth && firebase.auth.Auth.Persistence) {
+        auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch((err) => {
+          console.warn("[CounterSync Firebase] Auth local persistence notice:", err);
+        });
+      }
+
       if (typeof firebase.analytics === 'function' && config.measurementId) {
         try {
           firebase.analytics();

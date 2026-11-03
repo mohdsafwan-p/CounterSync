@@ -4507,3 +4507,110 @@ body:not(.light-theme) .policy-radio-card.active {
   background: rgba(239, 68, 68, 0.12);
   border: 2px solid rgba(239, 68, 68, 0.35);
 }
+
+/* --- History Summary Badges (Section 3) --- */
+.history-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+@media (max-width: 480px) {
+  .history-summary-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+.history-summary-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface-elevated);
+}
+.history-summary-card.donation-card {
+  border-color: rgba(219, 39, 119, 0.3);
+  background: linear-gradient(135deg, rgba(219, 39, 119, 0.05), rgba(219, 39, 119, 0.01));
+}
+.history-summary-card.transfer-card {
+  border-color: rgba(0, 102, 255, 0.3);
+  background: linear-gradient(135deg, rgba(0, 102, 255, 0.05), rgba(0, 102, 255, 0.01));
+}
+.history-summary-icon {
+  font-size: 1.6rem;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--bg-surface);
+}
+.donation-card .history-summary-icon {
+  background: rgba(219, 39, 119, 0.12);
+  color: #DB2777;
+}
+.transfer-card .history-summary-icon {
+  background: rgba(0, 102, 255, 0.12);
+  color: #0066FF;
+}
+.history-summary-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.history-summary-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+.history-summary-val {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+.donation-card .history-summary-val {
+  color: #DB2777;
+}
+.transfer-card .history-summary-val {
+  color: #0066FF;
+}
+.history-summary-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Owner Portal Screen Lock & Server Control Settings */
+.owner-server-ctrl-card {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.btn-purge-danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: #EF4444;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  font-weight: 800;
+  border-radius: 9999px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+.btn-purge-danger:hover {
+  background: #EF4444;
+  color: #FFFFFF;
+}

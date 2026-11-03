@@ -1024,7 +1024,7 @@ class CounterSyncStore {
   }
 
   // Receiver Peer Handshake: Accept or Reject Transfer
-  respondInterCounterTransfer({ eventKey, transferId, response, responderName }) {
+  respondInterCounterTransfer({ eventKey, transferId, response, action, responderName, authorizedBy }) {
     const data = this.getData();
     const event = data.events[eventKey];
     if (!event) throw new Error("Event not found");
@@ -1040,30 +1040,105 @@ class CounterSyncStore {
     const dest = event.counters.find(c => c.id === transfer.toCounterId);
 
     const nowIso = new Date().toISOString();
-    const isAccept = response === "ACCEPT";
+    const act = (action || response || "").toUpperCase();
+    const isAccept = act === "ACCEPT" || act === "ACCEPTED";
+    const resolver = responderName || authorizedBy || "Receiving Counter Staff";
 
     if (isAccept) {
       transfer.status = "ACCEPTED";
       transfer.resolved_at = nowIso;
-      transfer.resolved_by = responderName || "Receiving Counter Staff";
+      transfer.resolved_by = resolver;
 
-      // If BOOKS, credit to receiver (sender was already held on initiate)
+      // If BOOKS, credit to receiver (sender stock was already deducted/held upon initiate)
       if (transfer.type === "BOOKS" && dest) {
-        dest.currentStock += transfer.copies;
+        dest.currentStock += (transfer.copies || transfer.amountOrQuantity || 0);
       }
+      // If CASH, cash collection balances update automatically:
+      // receiver gains cashTransfersReceived, sender already has cashTransfersSent.
     } else {
       transfer.status = "REJECTED";
       transfer.resolved_at = nowIso;
-      transfer.resolved_by = responderName || "Receiving Counter Staff";
+      transfer.resolved_by = resolver;
 
-      // If BOOKS, release held stock back to sender
+      // If BOOKS, release reserved stock back to sender (Rollback)
       if (transfer.type === "BOOKS" && source) {
-        source.currentStock += transfer.copies;
+        source.currentStock += (transfer.copies || transfer.amountOrQuantity || 0);
       }
+      // If CASH, sender's deduction is cancelled because status is now REJECTED (only PENDING/ACCEPTED are deducted).
     }
 
     this.saveData(data);
     return transfer;
+  }
+
+  // --- Platform Owner & Server Control Operations ---
+  purgeEvent(eventKey) {
+    if (!eventKey) throw new Error("Event key is required for deletion");
+    const cleanKey = String(eventKey).trim().toUpperCase();
+    const data = this.getData();
+
+    // 1. Delete from local events
+    delete data.events[cleanKey];
+
+    // 2. Remove from platform rental registry
+    if (data.platform && data.platform.rentals) {
+      data.platform.rentals = data.platform.rentals.filter(r => (r.eventKey || '').toUpperCase() !== cleanKey);
+    }
+
+    // 3. Reset active event key if pointing to purged event
+    if (data.activeEventKey && data.activeEventKey.toUpperCase() === cleanKey) {
+      const remainingKeys = Object.keys(data.events);
+      data.activeEventKey = remainingKeys.length > 0 ? remainingKeys[0] : "";
+    }
+
+    this.saveData(data);
+
+    // 4. Purge from cloud Firestore if connected
+    if (typeof window !== 'undefined' && window.CS_Firebase && window.CS_Firebase.db) {
+      try {
+        window.CS_Firebase.db.collection('events').doc(cleanKey).delete().catch(e => {
+          console.warn("[CounterSync Firebase] Purge document notice:", e);
+        });
+      } catch (e) {}
+    }
+
+    this._notifySubscribers('EVENT_PURGED', { eventKey: cleanKey });
+    return true;
+  }
+
+  getOwnerPin() {
+    try {
+      return localStorage.getItem('countersync_owner_pin') || '3130';
+    } catch (e) {
+      return '3130';
+    }
+  }
+
+  setOwnerPin(newPin) {
+    const clean = String(newPin || '').trim();
+    if (clean.length < 4) {
+      throw new Error("Security PIN must be at least 4 digits");
+    }
+    try {
+      localStorage.setItem('countersync_owner_pin', clean);
+    } catch (e) {}
+    return true;
+  }
+
+  getOwnerLockTimer() {
+    try {
+      const val = parseInt(localStorage.getItem('countersync_owner_lock_timer'), 10);
+      return isNaN(val) ? 180 : val;
+    } catch (e) {
+      return 180;
+    }
+  }
+
+  setOwnerLockTimer(seconds) {
+    try {
+      localStorage.setItem('countersync_owner_lock_timer', String(seconds));
+    } catch (e) {}
+    return true;
   }
 
   // Backward compatible wrapper

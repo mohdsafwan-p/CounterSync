@@ -3,7 +3,7 @@
  * Bulletproof offline asset caching for outdoor festival tents & remote fairgrounds.
  */
 
-const CACHE_NAME = 'countersync-cache-v20';
+const CACHE_NAME = 'countersync-cache-v21';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

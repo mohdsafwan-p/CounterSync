@@ -22,7 +22,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800;900&family=Manjari:wght@400;700&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- Bulletproof Standalone CSS -->
-  <link rel="stylesheet" href="./css/style.css?v=20">
+  <link rel="stylesheet" href="./css/style.css?v=21">
 </head>
 <body>
   <div id="app">
@@ -455,8 +455,29 @@
           </div>
         </div>
 
-        <!-- TAB 3: HISTORY (Image 3) -->
+        <!-- TAB 3: HISTORY -->
         <div id="tab-pane-history" class="dock-content-pane hidden">
+          <!-- Summary Badges: Total Donations & Incoming Transfers (Requirement 3) -->
+          <div class="history-summary-grid">
+            <div class="history-summary-card donation-card">
+              <div class="history-summary-icon">💝</div>
+              <div class="history-summary-meta">
+                <span class="history-summary-title">Total Donations</span>
+                <span id="history-total-donations" class="history-summary-val">₹0</span>
+                <span id="history-donations-breakdown" class="history-summary-sub">Cash: ₹0 • G-Pay: ₹0</span>
+              </div>
+            </div>
+
+            <div class="history-summary-card transfer-card">
+              <div class="history-summary-icon">⇄</div>
+              <div class="history-summary-meta">
+                <span class="history-summary-title">Incoming Transfers</span>
+                <span id="history-incoming-transfers" class="history-summary-val">0 Copies</span>
+                <span id="history-transfers-breakdown" class="history-summary-sub">₹0 Cash Float Received</span>
+              </div>
+            </div>
+          </div>
+
           <div class="history-list-header">
             <span class="history-list-title">Recent Counter Transactions</span>
             <span id="counter-ledger-count" class="history-list-count">0 transactions</span>
@@ -469,17 +490,17 @@
 
         <!-- TAB 4: END OF DAY (Image 4) -->
         <div id="tab-pane-endofday" class="dock-content-pane hidden">
-          <!-- 1. Inter-Counter Stock Transfer Card (Soft Blue Background) -->
+          <!-- 1. Inter-Counter Transfer Card (Requirement 2 UI Text Updates) -->
           <div class="eod-transfer-banner">
             <div class="eod-transfer-info">
               <div class="eod-transfer-title-row">
-                <span class="eod-transfer-icon">⇆</span>
-                <span class="eod-transfer-heading">Inter-Counter Stock Transfer</span>
+                <span class="eod-transfer-icon">⇄</span>
+                <span class="eod-transfer-heading">Inter-Counter Transfer</span>
               </div>
-              <div class="eod-transfer-desc">Quickly share books with a neighbouring busy counter</div>
+              <div class="eod-transfer-desc">Quickly share books or cash with a neighboring busy counter</div>
             </div>
             <button type="button" class="btn-transfer-blue" id="btn-open-transfer-action">
-              Transfer Copies
+              Transfer
             </button>
           </div>
 
@@ -660,7 +681,7 @@
       <section id="view-stockroom" class="hidden">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 24px;">
           <div>
-            <h2 style="font-size: 1.8rem; letter-spacing: -0.03em;">Central Stock Room & Logistics Vault</h2>
+            <h2 style="font-size: 1.8rem; letter-spacing: -0.03em;">Central Stock Room</h2>
             <p style="font-size: 0.9rem; color: var(--text-secondary);">
               Managed by <strong id="stockroom-keeper-label" style="color: var(--cs-cyan);">Vikram Malhotra</strong> • Main Physical Warehouse
             </p>
@@ -684,7 +705,7 @@
           </div>
 
           <div class="kpi-tile" style="border-top: 4px solid var(--color-emerald); background: rgba(16, 185, 129, 0.05);">
-            <div class="kpi-tile-title">Remaining Vault Reserve</div>
+            <div class="kpi-tile-title">Remaining Stock Room Reserve</div>
             <div id="sr-kpi-reserve" class="kpi-tile-value text-emerald">1,630</div>
             <div class="kpi-tile-sub">Unallocated physical reserve in store</div>
           </div>
@@ -696,9 +717,9 @@
           </div>
 
           <div class="kpi-tile" style="border-top: 4px solid var(--color-amber);">
-            <div class="kpi-tile-title">Complimentary Vault Total</div>
+            <div class="kpi-tile-title">Free Copy Total (VIP Free Copies)</div>
             <div id="sr-kpi-giveaway" class="kpi-tile-value text-amber">50</div>
-            <div class="kpi-tile-sub">Direct vault dignitary issues</div>
+            <div class="kpi-tile-sub">Direct VIP & Free Copies</div>
           </div>
         </div>
 
@@ -723,23 +744,23 @@
             </button>
           </div>
 
-          <!-- 3.2 Direct Vault Complimentary Issues -->
+          <!-- 3.2 Direct Complimentary Issues -->
           <div class="stock-action-card">
-            <h3 style="color: var(--cs-cyan);">🎖️ Vault Dignitary Giveaway</h3>
+            <h3 style="color: var(--cs-cyan);">🎁 VIP Copy (Free Copy)</h3>
             <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 12px;">
               Issue complimentary copies straight from warehouse reserve.
             </p>
             <div style="margin-bottom: 8px;">
-              <input type="text" id="vault-giveaway-name" placeholder="Recipient Dignitary Name *">
+              <input type="text" id="vault-giveaway-name" placeholder="Recipient Name *">
             </div>
             <div style="margin-bottom: 8px;">
-              <input type="text" id="vault-giveaway-desig" placeholder="Designation / Guest Role *">
+              <input type="text" id="vault-giveaway-desig" placeholder="Role / Guest Designation (Optional)">
             </div>
             <div style="margin-bottom: 14px;">
               <input type="number" id="vault-giveaway-qty" value="5" min="1" max="50" placeholder="Qty">
             </div>
             <button id="btn-submit-vault-giveaway" class="btn-complete-sale" style="height: 44px; font-size: 0.95rem; background: linear-gradient(135deg, #00D2FF, #0066FF);">
-              Log Vault Giveaway
+              Log VIP Copy
             </button>
           </div>
 
@@ -1100,40 +1121,70 @@
           </div>
         </div>
 
-        <!-- Platform High-Level KPI Grid -->
-        <div class="owner-kpi-grid">
-          <div class="owner-kpi-card" style="border-left: 4px solid #F59E0B;">
-            <div class="owner-kpi-label">Pending Requests</div>
-            <div class="owner-kpi-val" id="owner-kpi-pending" style="color: #F59E0B;">0</div>
-            <div style="font-size: 0.72rem; color: var(--text-muted);">Awaiting review & approval</div>
+        <!-- Platform Access & Server Control Status Grid (Requirement 5 & 7) -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-bottom: 20px;">
+          <div class="owner-kpi-card" style="border-left: 4px solid #10B981; padding: 16px 20px;">
+            <div class="owner-kpi-label">Active Ongoing Events</div>
+            <div class="owner-kpi-val" id="owner-kpi-active" style="color: #10B981; font-size: 2.2rem;">0</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Currently authorized and running live</div>
           </div>
-          <div class="owner-kpi-card" style="border-left: 4px solid #10B981;">
-            <div class="owner-kpi-label">Active Event Licenses</div>
-            <div class="owner-kpi-val" id="owner-kpi-active" style="color: #10B981;">0</div>
-            <div style="font-size: 0.72rem; color: var(--text-muted);">Live on festival field</div>
+          <div class="owner-kpi-card" style="border-left: 4px solid #F59E0B; padding: 16px 20px;">
+            <div class="owner-kpi-label">Pending Host Applications</div>
+            <div class="owner-kpi-val" id="owner-kpi-pending" style="color: #F59E0B; font-size: 2.2rem;">0</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Awaiting owner review and license grant</div>
           </div>
-          <div class="owner-kpi-card" style="border-left: 4px solid #0066FF;">
-            <div class="owner-kpi-label">Total Fleet Books Sold</div>
-            <div class="owner-kpi-val" id="owner-kpi-sold" style="color: #0066FF;">0</div>
-            <div style="font-size: 0.72rem; color: var(--text-muted);">Copies across all events</div>
+        </div>
+
+        <!-- Security & Screen Lock Controls (Requirement 7) -->
+        <div class="owner-server-ctrl-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <h3 style="font-size: 1.05rem; font-weight: 800; margin: 0; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                <span>🔒</span> Security PIN & Inactivity Screen Lock
+              </h3>
+              <p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 3px;">
+                Protect owner console from unauthorized eyes. Lock pop-up requires your PIN to resume.
+              </p>
+            </div>
+            <button type="button" id="btn-owner-manual-lock" class="btn-pill" style="background: rgba(0, 102, 255, 0.12); color: #0066FF; border: 1px solid rgba(0, 102, 255, 0.3); font-size: 0.82rem; padding: 6px 14px; font-weight: 800;">
+              🔒 Lock Console Now
+            </button>
           </div>
-          <div class="owner-kpi-card" style="border-left: 4px solid #8B5CF6;">
-            <div class="owner-kpi-label">Total Fleet Revenue</div>
-            <div class="owner-kpi-val" id="owner-kpi-revenue" style="color: #8B5CF6;">₹0</div>
-            <div style="font-size: 0.72rem; color: var(--text-muted);">Cumulative counter cash + UPI</div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; align-items: end;">
+            <div>
+              <label class="input-label" for="owner-security-pin-input">Owner Security PIN</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="password" id="owner-security-pin-input" class="access-key-input font-mono" maxlength="6" placeholder="••••" value="3130" style="height: 40px; font-size: 1.1rem; text-align: center;">
+                <button type="button" id="btn-save-owner-pin" class="btn-pill btn-pill-primary" style="padding: 0 14px; height: 40px; font-size: 0.82rem; white-space: nowrap;">
+                  Save PIN
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label class="input-label" for="select-owner-lock-timer">Auto-Lock Timer</label>
+              <select id="select-owner-lock-timer" class="date-select" style="width: 100%; height: 40px; font-size: 0.85rem;">
+                <option value="60">1 Minute Inactivity</option>
+                <option value="120">2 Minutes Inactivity</option>
+                <option value="180" selected>3 Minutes Inactivity (Default)</option>
+                <option value="300">5 Minutes Inactivity</option>
+                <option value="0">Disabled (Never Lock)</option>
+              </select>
+            </div>
           </div>
         </div>
 
         <!-- Owner Tabs -->
         <div class="owner-tab-nav">
           <button class="owner-tab-btn active" data-owner-tab="inbox" id="tab-btn-owner-inbox">
-            📥 Rental Applications <span id="owner-inbox-counter" style="background: rgba(255,255,255,0.2); border-radius: 9999px; padding: 2px 7px; font-size: 0.75rem; margin-left: 4px;">0</span>
+            📥 Host Approval Queue <span id="owner-inbox-counter" style="background: rgba(255,255,255,0.2); border-radius: 9999px; padding: 2px 7px; font-size: 0.75rem; margin-left: 4px;">0</span>
           </button>
           <button class="owner-tab-btn" data-owner-tab="events" id="tab-btn-owner-events">
-            🎪 All Running Events (<span id="owner-events-counter">0</span>)
+            🎪 Running Events & Server Control (<span id="owner-events-counter">0</span>)
           </button>
           <button class="owner-tab-btn" data-owner-tab="grant" id="tab-btn-owner-grant">
-            ⚡ Direct License Grant
+            ⚡ Pre-Approve Host
           </button>
         </div>
 
@@ -1435,18 +1486,80 @@
       </div>
     </div>
 
-    <!-- Unified Inter-Counter Exchange Modal (Section 1.2) -->
+    <!-- 2.5 Streamlined Tip / Donation Modal (Requirement 1) -->
+    <div id="modal-tip-donation" class="modal-overlay hidden">
+      <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.3rem;">💝</span>
+            <h3 style="color: #DB2777; font-weight: 800; margin: 0;">Add Tip / Donation</h3>
+          </div>
+          <button class="modal-close-btn" data-close-modal="modal-tip-donation">✕</button>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;">
+          Record discretionary donation or retained excess balance without altering book stock.
+        </p>
+
+        <!-- 1. Amount Input -->
+        <div style="margin-bottom: 16px;">
+          <label class="input-label" for="donation-modal-amount">Donation Amount (₹) *</label>
+          <input type="number" id="donation-modal-amount" class="access-key-input font-mono" placeholder="e.g. 50, 100, 200, 500" min="1" step="10" inputmode="numeric">
+          <div class="quick-tender-pills" style="margin-top: 8px; justify-content: center;">
+            <button type="button" class="btn-tender-chip" onclick="document.getElementById('donation-modal-amount').value='50'">₹50</button>
+            <button type="button" class="btn-tender-chip" onclick="document.getElementById('donation-modal-amount').value='100'">₹100</button>
+            <button type="button" class="btn-tender-chip" onclick="document.getElementById('donation-modal-amount').value='200'">₹200</button>
+            <button type="button" class="btn-tender-chip" onclick="document.getElementById('donation-modal-amount').value='500'">₹500</button>
+          </div>
+        </div>
+
+        <!-- 2. Payment Mode Selector: Cash vs G-Pay -->
+        <div style="margin-bottom: 16px;">
+          <label class="input-label">Payment Mode *</label>
+          <div class="pay-mode-two-grid" style="margin-bottom: 0;">
+            <button type="button" class="pay-mode-card cash active" id="btn-donation-mode-cash" style="min-height: 52px; padding: 10px 12px;">
+              <div class="pay-icon-tile bg-emerald-light" style="width: 32px; height: 32px;">
+                <span style="font-size: 1.1rem;">💵</span>
+              </div>
+              <div class="pay-mode-meta">
+                <div class="pay-mode-name" style="font-size: 0.88rem;">CASH</div>
+              </div>
+            </button>
+            <button type="button" class="pay-mode-card upi" id="btn-donation-mode-gpay" style="min-height: 52px; padding: 10px 12px;">
+              <div class="pay-icon-tile bg-blue-light" style="width: 32px; height: 32px;">
+                <span style="font-size: 1.1rem;">📱</span>
+              </div>
+              <div class="pay-mode-meta">
+                <div class="pay-mode-name" style="font-size: 0.88rem;">G-PAY</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. Donor Name / Note (Optional) -->
+        <div style="margin-bottom: 20px;">
+          <label class="input-label" for="donation-modal-donor">Donor Name or Note (Optional)</label>
+          <input type="text" id="donation-modal-donor" class="form-input" placeholder="e.g. Well-wisher, or Waived change">
+        </div>
+
+        <!-- 4. Submit Button -->
+        <button type="button" id="btn-submit-donation" class="btn-complete-sale" style="height: 48px; font-size: 1rem; font-weight: 800; background: linear-gradient(135deg, #DB2777, #BE185D);">
+          Add Donation
+        </button>
+      </div>
+    </div>
+
+    <!-- Unified Inter-Counter Transfer Modal (Requirement 2) -->
     <div id="modal-counter-exchange" class="modal-overlay hidden">
       <div class="modal-content" style="max-width: 440px;">
         <div class="modal-header">
           <div style="display: flex; align-items: center; gap: 8px;">
             <span style="font-size: 1.4rem;">⇄</span>
-            <h3 style="color: #0066FF; font-weight: 800; margin: 0;">Inter-Counter Exchange</h3>
+            <h3 style="color: #0066FF; font-weight: 800; margin: 0;">Inter-Counter Transfer</h3>
           </div>
           <button class="modal-close-btn" data-close-modal="modal-counter-exchange">✕</button>
         </div>
         <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;">
-          Share books or cash float with neighbouring desks. Initiates a two-way handshake requiring peer acceptance.
+          Quickly share books or cash with a neighboring busy counter
         </p>
 
         <!-- Segmented Transfer Type Selector -->
@@ -1490,7 +1603,7 @@
             Cancel
           </button>
           <button type="button" id="btn-submit-counter-exchange" class="btn-complete-sale press-effect" style="height: 48px; font-weight: 800; font-size: 0.95rem;">
-            Send Transfer Request ➔
+            Transfer
           </button>
         </div>
       </div>
@@ -1894,7 +2007,7 @@
   <script src="./js/firebase-config.js?v=20"></script>
   <script src="./js/qrcode.js?v=20"></script>
   <script src="./js/seed.js?v=20"></script>
-  <script src="./js/store.js?v=20"></script>
-  <script src="./js/app.js?v=20"></script>
+  <script src="./js/store.js?v=21"></script>
+  <script src="./js/app.js?v=21"></script>
 </body>
 </html>

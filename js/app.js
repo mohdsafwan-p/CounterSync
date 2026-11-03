@@ -354,8 +354,9 @@
     if (el.viewRentalStatus) el.viewRentalStatus.classList.toggle('hidden', viewName !== 'rental-status');
 
     // Quick lock visibility
-    el.btnQuickLock.classList.toggle('hidden', viewName === 'landing' || viewName === 'owner-portal');
-    el.idleTimerDisplay.classList.toggle('hidden', viewName === 'landing' || viewName === 'owner-portal');
+    const isOwnerTimerDisabled = (viewName === 'owner-portal' && CS_Store.getOwnerLockTimer && CS_Store.getOwnerLockTimer() === 0);
+    el.btnQuickLock.classList.toggle('hidden', viewName === 'landing');
+    el.idleTimerDisplay.classList.toggle('hidden', viewName === 'landing' || isOwnerTimerDisabled);
 
     // Update context badge
     const event = CS_Store.getEvent(state.eventKey);
@@ -407,10 +408,18 @@
     }
   }
 
-  // --- Inactivity Auto-Lock (3-Minute Idle Timer) ---
+  // --- Inactivity Auto-Lock (Configurable Idle Timer) ---
   function startIdleTimer() {
     stopIdleTimer();
-    state.idleSecondsRemaining = 180; // 3 minutes
+    let duration = 180; // 3 minutes default
+    if (state.currentView === 'owner-portal' || state.role === 'OWNER') {
+      duration = CS_Store.getOwnerLockTimer ? CS_Store.getOwnerLockTimer() : 180;
+      if (duration === 0) {
+        if (el.idleSeconds) el.idleSeconds.textContent = 'OFF';
+        return; // Auto-lock disabled for Owner Console
+      }
+    }
+    state.idleSecondsRemaining = duration;
     updateIdleDisplay();
 
     state.idleTimerInterval = setInterval(() => {
@@ -432,7 +441,12 @@
 
   function resetIdleActivity() {
     if (state.currentView !== 'landing' && !el.lockoutScreen.classList.contains('active')) {
-      state.idleSecondsRemaining = 180;
+      let duration = 180;
+      if (state.currentView === 'owner-portal' || state.role === 'OWNER') {
+        duration = CS_Store.getOwnerLockTimer ? CS_Store.getOwnerLockTimer() : 180;
+        if (duration === 0) return;
+      }
+      state.idleSecondsRemaining = duration;
       updateIdleDisplay();
     }
   }
@@ -454,7 +468,12 @@
     const lockoutHint = document.getElementById('lockout-pin-hint');
     const unlockBtn = document.getElementById('btn-submit-unlock');
 
-    if (state.currentView === 'pos' || state.role === 'POS') {
+    if (state.currentView === 'owner-portal' || state.role === 'OWNER') {
+      if (lockoutTitle) lockoutTitle.textContent = 'Owner Console Locked';
+      if (lockoutDesc) lockoutDesc.textContent = 'Platform Owner security lock. Enter Owner PIN to resume.';
+      if (lockoutHint) lockoutHint.textContent = 'Authorized: safwanvgd313@gmail.com';
+      if (unlockBtn) unlockBtn.textContent = 'Unlock Owner Console';
+    } else if (state.currentView === 'pos' || state.role === 'POS') {
       const counter = (event && state.counterId) ? CS_Store.getCounter(state.eventKey, state.counterId) : null;
       const counterName = counter ? counter.name : 'Sales Counter';
       if (lockoutTitle) lockoutTitle.textContent = `${counterName} Locked`;
@@ -490,12 +509,18 @@
   function unlockWorkspace() {
     const enteredPin = el.inputUnlockPin.value.trim();
     const event = CS_Store.getEvent(state.eventKey);
-    if (!event) return;
 
     let valid = false;
     let expectedRoleName = '';
 
-    if (state.currentView === 'pos' || state.role === 'POS') {
+    if (state.currentView === 'owner-portal' || state.role === 'OWNER') {
+      expectedRoleName = 'Owner Console';
+      const ownerPin = CS_Store.getOwnerPin ? CS_Store.getOwnerPin() : '3130';
+      if (enteredPin === String(ownerPin)) {
+        valid = true;
+      }
+    } else if (state.currentView === 'pos' || state.role === 'POS') {
+      if (!event) return;
       const counter = state.counterId ? CS_Store.getCounter(state.eventKey, state.counterId) : null;
       expectedRoleName = counter ? counter.name : 'Sales Counter';
       // STRICT: Only this specific counter's PIN is accepted! Super Admin PIN and Stock Room PIN are strictly rejected!
@@ -503,12 +528,14 @@
         valid = true;
       }
     } else if (state.currentView === 'stockroom' || state.role === 'STOCKROOM') {
+      if (!event) return;
       expectedRoleName = 'Stock Room';
       // STRICT: Only Stock Room PIN is accepted!
       if (enteredPin === String(event.stockRoomPin)) {
         valid = true;
       }
     } else if (state.currentView === 'admin' || state.role === 'ADMIN') {
+      if (!event) return;
       expectedRoleName = 'Super Admin';
       // STRICT: Only Super Admin PIN or 9999 is accepted!
       if (enteredPin === String(event.adminPin) || enteredPin === '9999') {
@@ -1218,13 +1245,92 @@
       });
     }
 
-    // Micro-Donation & Excess Tender Toggle (Section 1.1)
-    if (el.btnToggleDonationPane && el.panelDonationExcess) {
+    // Streamlined Tip / Donation Modal (Section 1.1)
+    function openTipDonationModal() {
+      const modal = document.getElementById('modal-tip-donation');
+      const amtInput = document.getElementById('donation-modal-amount');
+      const donorInput = document.getElementById('donation-modal-donor');
+      const btnCash = document.getElementById('btn-donation-mode-cash');
+      const btnGpay = document.getElementById('btn-donation-mode-gpay');
+
+      if (amtInput) amtInput.value = '';
+      if (donorInput) donorInput.value = '';
+      state.donationModalPayMode = 'CASH';
+
+      if (btnCash) btnCash.classList.add('active');
+      if (btnGpay) btnGpay.classList.remove('active');
+
+      if (modal) {
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+          if (amtInput) amtInput.focus();
+        }, 60);
+      }
+    }
+
+    if (el.btnToggleDonationPane) {
       el.btnToggleDonationPane.addEventListener('click', () => {
-        const isHidden = el.panelDonationExcess.classList.toggle('hidden');
-        el.btnToggleDonationPane.classList.toggle('active', !isHidden);
-        if (!isHidden && el.inputCashTendered) {
-          setTimeout(() => el.inputCashTendered.focus(), 60);
+        openTipDonationModal();
+      });
+    }
+
+    const btnDonationCash = document.getElementById('btn-donation-mode-cash');
+    const btnDonationGpay = document.getElementById('btn-donation-mode-gpay');
+    if (btnDonationCash) {
+      btnDonationCash.addEventListener('click', () => {
+        state.donationModalPayMode = 'CASH';
+        btnDonationCash.classList.add('active');
+        if (btnDonationGpay) btnDonationGpay.classList.remove('active');
+        triggerHaptic('light');
+      });
+    }
+    if (btnDonationGpay) {
+      btnDonationGpay.addEventListener('click', () => {
+        state.donationModalPayMode = 'UPI';
+        btnDonationGpay.classList.add('active');
+        if (btnDonationCash) btnDonationCash.classList.remove('active');
+        triggerHaptic('light');
+      });
+    }
+
+    const btnSubmitDonation = document.getElementById('btn-submit-donation');
+    if (btnSubmitDonation) {
+      btnSubmitDonation.addEventListener('click', () => {
+        const amtInput = document.getElementById('donation-modal-amount');
+        const donorInput = document.getElementById('donation-modal-donor');
+        const amt = amtInput ? parseInt(amtInput.value, 10) : 0;
+        const donor = (donorInput ? donorInput.value.trim() : '') || 'Anonymous Donor';
+        const mode = state.donationModalPayMode || 'CASH';
+
+        if (isNaN(amt) || amt <= 0) {
+          CS_Audio.alertWarning();
+          showToast('Please enter a valid donation amount (₹)', 'error');
+          if (amtInput) amtInput.focus();
+          return;
+        }
+
+        try {
+          CS_Store.recordDonation({
+            eventKey: state.eventKey,
+            counterId: state.counterId,
+            amount: amt,
+            donorName: donor,
+            paymentMode: mode === 'UPI' ? 'UPI' : 'CASH',
+            notes: mode === 'UPI' ? 'Direct G-Pay Tip/Donation' : 'Direct Cash Tip/Donation'
+          });
+
+          const modal = document.getElementById('modal-tip-donation');
+          if (modal) modal.classList.add('hidden');
+
+          CS_Audio.handshakeSuccess();
+          showToast(`Recorded ₹${amt} Tip/Donation (${mode === 'UPI' ? 'G-Pay' : 'Cash'}) from ${donor}`, 'success');
+          renderPOSWorkspace();
+          if (state.activeDockTab === 'history') {
+            renderCounterShiftLedger();
+          }
+        } catch (err) {
+          CS_Audio.alertWarning();
+          showToast(err.message, 'error');
         }
       });
     }
@@ -1951,50 +2057,217 @@
     const countEl = document.getElementById('counter-ledger-count');
     if (!container || !event) return;
 
-    // Filter active (non-voided) shift transactions for this counter, sorted newest first
-    const txns = (event.transactions || [])
-      .filter(t => t.counterId === state.counterId && !t.voided)
-      .slice()
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    // 1. Calculate Shift Donations for Active Counter (Requirement 3: Summary Badges)
+    const counterDonations = (event.donations || []).filter(d => d.counter_id === state.counterId);
+    let cashDonations = 0;
+    let gpayDonations = 0;
+    counterDonations.forEach(d => {
+      const mode = (d.payment_mode || 'CASH').toUpperCase();
+      if (mode.includes('UPI') || mode.includes('GPAY')) {
+        gpayDonations += (Number(d.amount) || 0);
+      } else {
+        cashDonations += (Number(d.amount) || 0);
+      }
+    });
 
-    if (countEl) countEl.textContent = `${txns.length} ${txns.length === 1 ? 'transaction' : 'transactions'}`;
+    // Also include excess change / tips embedded in sales transactions
+    (event.transactions || []).forEach(t => {
+      if (t.counterId === state.counterId && !t.voided && t.donationAmount > 0 && t.type !== 'DONATION') {
+        const mode = (t.paymentMode || 'CASH').toUpperCase();
+        if (mode.includes('UPI') || mode.includes('GPAY')) {
+          gpayDonations += (Number(t.donationAmount) || 0);
+        } else {
+          cashDonations += (Number(t.donationAmount) || 0);
+        }
+      }
+    });
+
+    const totalDonations = cashDonations + gpayDonations;
+    const elTotDonations = document.getElementById('history-total-donations');
+    const elDonBreakdown = document.getElementById('history-donations-breakdown');
+    if (elTotDonations) elTotDonations.textContent = `₹${totalDonations.toLocaleString('en-IN')}`;
+    if (elDonBreakdown) elDonBreakdown.textContent = `Cash: ₹${cashDonations.toLocaleString('en-IN')} | G-Pay: ₹${gpayDonations.toLocaleString('en-IN')}`;
+
+    // 2. Calculate Incoming Transfers Received at this Counter
+    const incomingTransfers = (event.transfers || []).filter(tr => 
+      (tr.toCounterId === state.counterId || tr.to_counter === state.counterId) && 
+      (tr.status === 'ACCEPTED' || tr.status === 'COMPLETED')
+    );
+    const inBooks = incomingTransfers.filter(tr => tr.type === 'BOOKS').reduce((s, tr) => s + (Number(tr.copies || tr.amountOrQuantity || tr.amount_or_quantity) || 0), 0);
+    const inCash = incomingTransfers.filter(tr => tr.type === 'CASH').reduce((s, tr) => s + (Number(tr.cashAmount || tr.amountOrQuantity || tr.amount_or_quantity) || 0), 0);
+
+    const elInTransfers = document.getElementById('history-incoming-transfers');
+    const elTrBreakdown = document.getElementById('history-transfers-breakdown');
+    if (elInTransfers) elInTransfers.textContent = `+${inBooks} bks / ₹${inCash.toLocaleString('en-IN')}`;
+    if (elTrBreakdown) elTrBreakdown.textContent = `Books: +${inBooks} | Cash: ₹${inCash.toLocaleString('en-IN')}`;
+
+    // 3. Compile Unified Chronological Activity Stream (Sale, Donation, Transfer Sent, Transfer Received)
+    const activityItems = [];
+
+    // Sales & VIP & Direct Donations recorded in transactions
+    (event.transactions || []).forEach(t => {
+      if (t.counterId === state.counterId) {
+        activityItems.push({
+          kind: 'TXN',
+          id: t.id,
+          timestamp: t.timestamp,
+          type: t.type || (t.copies === 0 && t.donationAmount > 0 ? 'DONATION' : 'SALE'),
+          copies: t.copies || 0,
+          amount: t.totalAmount || 0,
+          donationAmount: t.donationAmount || 0,
+          buyerName: t.buyerName,
+          paymentMode: t.paymentMode || 'CASH',
+          voided: !!t.voided
+        });
+      }
+    });
+
+    // Inter-Counter Transfers involving this counter
+    (event.transfers || []).forEach(tr => {
+      const isFrom = (tr.fromCounterId === state.counterId || tr.from_counter === state.counterId);
+      const isTo = (tr.toCounterId === state.counterId || tr.to_counter === state.counterId);
+      if (isFrom) {
+        activityItems.push({
+          kind: 'TRANSFER_SENT',
+          id: tr.id || tr.transfer_id,
+          timestamp: tr.initiated_at || tr.timestamp,
+          transferType: tr.type,
+          copies: tr.copies || (tr.type === 'BOOKS' ? (tr.amountOrQuantity || tr.amount_or_quantity || 0) : 0),
+          amount: tr.cashAmount || (tr.type === 'CASH' ? (tr.amountOrQuantity || tr.amount_or_quantity || 0) : 0),
+          targetName: tr.toCounterName || tr.toCounterId || tr.to_counter,
+          status: tr.status || 'PENDING',
+          notes: tr.notes || ''
+        });
+      } else if (isTo) {
+        activityItems.push({
+          kind: 'TRANSFER_RECEIVED',
+          id: tr.id || tr.transfer_id,
+          timestamp: tr.resolved_at || tr.initiated_at || tr.timestamp,
+          transferType: tr.type,
+          copies: tr.copies || (tr.type === 'BOOKS' ? (tr.amountOrQuantity || tr.amount_or_quantity || 0) : 0),
+          amount: tr.cashAmount || (tr.type === 'CASH' ? (tr.amountOrQuantity || tr.amount_or_quantity || 0) : 0),
+          senderName: tr.fromCounterName || tr.fromCounterId || tr.from_counter,
+          status: tr.status || 'PENDING',
+          notes: tr.notes || ''
+        });
+      }
+    });
+
+    // Sort newest first
+    activityItems.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    if (countEl) countEl.textContent = `${activityItems.length} ${activityItems.length === 1 ? 'record' : 'records'}`;
     container.innerHTML = '';
 
-    if (txns.length === 0) {
-      container.innerHTML = `<div style="text-align:center; padding: 28px; color: var(--text-muted); font-size: 0.9rem;">No transactions recorded on this counter shift yet.</div>`;
+    if (activityItems.length === 0) {
+      container.innerHTML = `<div style="text-align:center; padding: 28px; color: var(--text-muted); font-size: 0.9rem;">No transactions or transfers recorded on this counter shift yet.</div>`;
       return;
     }
 
-    txns.forEach(t => {
+    activityItems.forEach(item => {
       const card = document.createElement('div');
-      card.className = `history-txn-card ${t.voided ? 'voided' : ''}`;
+      card.className = `history-txn-card ${item.voided ? 'voided' : ''}`;
+      const timeStr = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-      const timeStr = new Date(t.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      if (item.kind === 'TXN') {
+        const isDonation = item.type === 'DONATION' || (item.copies === 0 && item.donationAmount > 0);
+        const isVip = item.type === 'VIP' || item.type === 'VAULT_GIVEAWAY';
 
-      card.innerHTML = `
-        <div class="history-txn-left">
-          <div class="history-badge-green" style="${t.type === 'VIP' ? 'background: rgba(147, 51, 234, 0.12); color: #9333EA;' : ''}">+${t.copies}</div>
-          <div>
-            <div class="history-txn-buyer">${t.buyerName || 'Direct Buyer'}</div>
-            <div class="history-txn-time">${timeStr} • ${t.paymentMode}</div>
+        let badgeClass = 'history-badge-green';
+        let badgeText = `+${item.copies}`;
+        let titleText = item.buyerName || 'Direct Buyer';
+        let costText = `₹${item.amount.toLocaleString('en-IN')}`;
+        let metaText = `${timeStr} • ${item.paymentMode}`;
+
+        if (isDonation) {
+          badgeClass = 'history-badge-pink';
+          badgeText = '❤️ Tip';
+          titleText = item.buyerName || 'Patron Donor';
+          costText = `₹${(item.donationAmount || item.amount).toLocaleString('en-IN')}`;
+        } else if (isVip) {
+          badgeClass = 'history-badge-purple';
+          badgeText = '👑 VIP';
+          titleText = item.buyerName || 'Dignitary Handover';
+          costText = 'Free VIP';
+        }
+
+        card.innerHTML = `
+          <div class="history-txn-left">
+            <div class="${badgeClass}" style="${isDonation ? 'background: rgba(219, 39, 119, 0.12); color: #DB2777;' : (isVip ? 'background: rgba(147, 51, 234, 0.12); color: #9333EA;' : '')}">
+              ${badgeText}
+            </div>
+            <div>
+              <div class="history-txn-buyer">${titleText}</div>
+              <div class="history-txn-time">${metaText}</div>
+            </div>
           </div>
-        </div>
-        <div class="history-txn-right">
-          <div class="history-txn-cost" style="${t.type === 'VIP' ? 'color: #9333EA; font-size: 0.9rem;' : ''}">${t.type === 'VIP' ? 'Free VIP' : '₹' + t.totalAmount}</div>
-          ${t.voided ? `
-            <span style="font-size:0.75rem; color:#EF4444; font-weight:800;">Cancelled</span>
-          ` : `
-            <button type="button" class="btn-cancel-void-pill" data-void-id="${t.id}">↺ Cancel</button>
-          `}
-        </div>
-      `;
+          <div class="history-txn-right">
+            <div class="history-txn-cost" style="${isDonation ? 'color: #DB2777;' : (isVip ? 'color: #9333EA; font-size: 0.88rem;' : '')}">
+              ${costText}
+            </div>
+            ${item.voided ? `
+              <span style="font-size:0.75rem; color:#EF4444; font-weight:800;">Cancelled</span>
+            ` : `
+              <button type="button" class="btn-cancel-void-pill" data-void-id="${item.id}">↺ Cancel</button>
+            `}
+          </div>
+        `;
 
-      card.querySelectorAll('.btn-cancel-void-pill').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          openVoidDialog(t.id);
+        card.querySelectorAll('.btn-cancel-void-pill').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openVoidDialog(item.id);
+          });
         });
-      });
+      } else if (item.kind === 'TRANSFER_SENT') {
+        const itemVal = item.transferType === 'CASH' ? `₹${item.amount}` : `${item.copies} bks`;
+        const statusColors = {
+          PENDING: '#F59E0B',
+          ACCEPTED: '#10B981',
+          REJECTED: '#EF4444'
+        };
+        const statusColor = statusColors[item.status] || '#F59E0B';
+
+        card.innerHTML = `
+          <div class="history-txn-left">
+            <div style="width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: rgba(245, 158, 11, 0.12); color: #D97706; font-size: 1.05rem; font-weight: 800;">
+              ↗️
+            </div>
+            <div>
+              <div class="history-txn-buyer">Transfer Sent to ${item.targetName}</div>
+              <div class="history-txn-time">${timeStr} • ${item.transferType === 'CASH' ? 'Cash Float' : 'Book Stock'}${item.notes ? ' • "' + item.notes + '"' : ''}</div>
+            </div>
+          </div>
+          <div class="history-txn-right">
+            <div class="history-txn-cost" style="color: #D97706; font-size: 0.95rem;">-${itemVal}</div>
+            <span style="font-size: 0.72rem; font-weight: 800; color: ${statusColor}; text-transform: uppercase;">${item.status}</span>
+          </div>
+        `;
+      } else if (item.kind === 'TRANSFER_RECEIVED') {
+        const itemVal = item.transferType === 'CASH' ? `₹${item.amount}` : `+${item.copies} bks`;
+        const statusColors = {
+          PENDING: '#F59E0B',
+          ACCEPTED: '#10B981',
+          REJECTED: '#EF4444'
+        };
+        const statusColor = statusColors[item.status] || '#F59E0B';
+
+        card.innerHTML = `
+          <div class="history-txn-left">
+            <div style="width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: rgba(0, 102, 255, 0.12); color: #0066FF; font-size: 1.05rem; font-weight: 800;">
+              ↙️
+            </div>
+            <div>
+              <div class="history-txn-buyer">Transfer Received from ${item.senderName}</div>
+              <div class="history-txn-time">${timeStr} • ${item.transferType === 'CASH' ? 'Cash Float' : 'Book Stock'}${item.notes ? ' • "' + item.notes + '"' : ''}</div>
+            </div>
+          </div>
+          <div class="history-txn-right">
+            <div class="history-txn-cost" style="color: #0066FF; font-size: 0.95rem;">${itemVal}</div>
+            <span style="font-size: 0.72rem; font-weight: 800; color: ${statusColor}; text-transform: uppercase;">${item.status}</span>
+          </div>
+        `;
+      }
 
       container.appendChild(card);
     });
@@ -3064,38 +3337,19 @@
     const rentals = CS_Store.getPlatformRentals();
     const data = CS_Store.getData();
 
-    // 1. KPI Aggregation
+    // 1. KPI Aggregation (Requirement 5: Active Events Counter & Pending Applications only)
     const pendingCount = rentals.filter(r => r.status === 'PENDING').length;
-    const activeCount = rentals.filter(r => r.status === 'ACTIVE').length;
-
-    let totalSold = 0;
-    let totalRevenue = 0;
-    if (data.events) {
-      Object.values(data.events).forEach(ev => {
-        if (ev.transactions) {
-          ev.transactions.forEach(t => {
-            if (!t.voided && t.type !== 'VIP' && t.paymentMode !== 'FREE_VIP') {
-              totalSold += (t.copies || 0);
-              totalRevenue += (t.totalAmount || 0);
-            }
-          });
-        }
-      });
-    }
+    const activeCount = Object.keys(data.events || {}).length;
 
     const elPending = document.getElementById('owner-kpi-pending');
     const elActive = document.getElementById('owner-kpi-active');
-    const elSold = document.getElementById('owner-kpi-sold');
-    const elRev = document.getElementById('owner-kpi-revenue');
     const elInboxCounter = document.getElementById('owner-inbox-counter');
     const elEventsCounter = document.getElementById('owner-events-counter');
 
     if (elPending) elPending.textContent = pendingCount;
     if (elActive) elActive.textContent = activeCount;
-    if (elSold) elSold.textContent = totalSold.toLocaleString();
-    if (elRev) elRev.textContent = `₹${totalRevenue.toLocaleString()}`;
     if (elInboxCounter) elInboxCounter.textContent = pendingCount;
-    if (elEventsCounter) elEventsCounter.textContent = Object.keys(data.events || {}).length;
+    if (elEventsCounter) elEventsCounter.textContent = activeCount;
 
     // 2. Render Inbox (Applications)
     const listEl = document.getElementById('owner-rental-requests-list');
@@ -3164,7 +3418,7 @@
                   <button class="btn-pill btn-pill-subtle" onclick="window.handleExtendRentalPrompt('${r.id}')" style="font-size: 0.80rem; padding: 6px 12px;">
                     ⏱️ Extend Expiry
                   </button>
-                  <button class="btn-pill" style="font-size: 0.80rem; padding: 6px 12px; background: rgba(239, 68, 68, 0.12); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.3);" onclick="window.handleSuspendRental('${r.id}')">
+                  <button class="btn-pill" style="font-size: 0.80rem; padding: 6px 12px; background: rgba(239, 68, 68, 0.12); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.3);" onclick="window.handleSuspendRental('${rentalId || r.id}')">
                     ⛔ Deny Access / Revoke License
                   </button>
                   <button class="btn-pill btn-pill-subtle" onclick="window.handleOwnerInspectEvent('${r.eventKey}')" style="font-size: 0.80rem; padding: 6px 12px;">
@@ -3184,26 +3438,16 @@
       }
     }
 
-    // 3. Render Fleet Events List
+    // 3. Render Fleet Events List (Streamlined: Access Management & Grand Purge only)
     const fleetEl = document.getElementById('owner-active-events-list');
     if (fleetEl && data.events) {
       const eventKeys = Object.keys(data.events);
       if (eventKeys.length === 0) {
-        fleetEl.innerHTML = `<div style="text-align: center; padding: 32px; color: var(--text-muted);">No events registered.</div>`;
+        fleetEl.innerHTML = `<div style="text-align: center; padding: 32px; color: var(--text-muted);">No events registered on platform.</div>`;
       } else {
         fleetEl.innerHTML = eventKeys.map(key => {
           const ev = data.events[key];
           const rental = rentals.find(r => (r.eventKey || '').toUpperCase() === key.toUpperCase());
-          let sold = 0;
-          let rev = 0;
-          if (ev.transactions) {
-            ev.transactions.forEach(t => {
-              if (!t.voided && t.type !== 'VIP' && t.paymentMode !== 'FREE_VIP') {
-                sold += (t.copies || 0);
-                rev += (t.totalAmount || 0);
-              }
-            });
-          }
           const countersCount = (ev.counters || []).length;
           const status = rental ? rental.status : 'ACTIVE';
           const isExpired = rental && rental.expiresAt && new Date() > new Date(rental.expiresAt);
@@ -3228,19 +3472,19 @@
               <div class="rental-meta-grid">
                 <div class="rental-meta-cell">
                   <span class="rental-meta-title">Live Counters</span>
-                  <span class="rental-meta-val">${countersCount} Active</span>
-                </div>
-                <div class="rental-meta-cell">
-                  <span class="rental-meta-title">Total Sold</span>
-                  <span class="rental-meta-val" style="color: #0066FF;">${sold} Copies</span>
-                </div>
-                <div class="rental-meta-cell">
-                  <span class="rental-meta-title">Gross Revenue</span>
-                  <span class="rental-meta-val" style="color: #10B981;">₹${rev.toLocaleString()}</span>
+                  <span class="rental-meta-val">${countersCount} Desks Active</span>
                 </div>
                 <div class="rental-meta-cell">
                   <span class="rental-meta-title">License Expiry</span>
                   <span class="rental-meta-val">${rental && rental.expiresAt ? new Date(rental.expiresAt).toLocaleDateString() : 'Permanent'}</span>
+                </div>
+                <div class="rental-meta-cell">
+                  <span class="rental-meta-title">Assigned Host</span>
+                  <span class="rental-meta-val">${rental ? rental.hostEmail : 'safwanvgd313@gmail.com'}</span>
+                </div>
+                <div class="rental-meta-cell">
+                  <span class="rental-meta-title">Created Date</span>
+                  <span class="rental-meta-val">${ev.createdAt ? new Date(ev.createdAt).toLocaleDateString() : 'Active'}</span>
                 </div>
               </div>
 
@@ -3250,12 +3494,15 @@
                 </button>
                 ${rental ? `
                   <button class="btn-pill btn-pill-subtle" onclick="window.handleExtendRentalPrompt('${rental.id}')" style="font-size: 0.80rem; padding: 6px 12px;">
-                    ⏱️ Extend Rental
+                    ⏱️ Extend Expiry
                   </button>
                   <button class="btn-pill" style="font-size: 0.80rem; padding: 6px 12px; background: rgba(239, 68, 68, 0.12); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.3);" onclick="window.handleSuspendRental('${rental.id}')">
                     ⛔ Deny Access / Revoke
                   </button>
                 ` : ''}
+                <button class="btn-pill btn-purge-danger" onclick="window.handleOwnerPurgeEvent('${key}', '${(ev.name || key).replace(/'/g, "\\'")}')">
+                  🗑️ Delete Event & Purge Data
+                </button>
               </div>
             </div>
           `;
@@ -3263,6 +3510,30 @@
       }
     }
   }
+
+  // Grand Delete / Hard Purge Handler (Requirement 5)
+  window.handleOwnerPurgeEvent = async function(eventKey, eventName) {
+    const isSpecial = eventKey === 'CS2026' || (eventName && eventName.toLowerCase().includes('almuneer'));
+    const promptMsg = isSpecial 
+      ? `⚠️ GRAND PURGE WARNING: You are about to permanently purge test event "${eventName}" (${eventKey}).\n\nThis will completely delete all counter registers, transactions, sales, and platform rentals from localStorage, IndexedDB, and the cloud Firestore database.\n\nType DELETE to confirm:`
+      : `⚠️ GRAND PURGE: Are you sure you want to completely remove "${eventName}" (${eventKey}) and purge all counter records and transactions from the server database?\n\nThis cannot be undone. Type DELETE to confirm:`;
+
+    const conf = prompt(promptMsg);
+    if (conf !== 'DELETE') {
+      showToast('Purge cancelled. Data unchanged.', 'info');
+      return;
+    }
+
+    try {
+      showToast(`Purging event ${eventKey}...`, 'info');
+      await CS_Store.purgeEvent(eventKey);
+      if (typeof CS_Audio !== 'undefined' && CS_Audio.alertWarning) CS_Audio.alertWarning();
+      showToast(`Event "${eventName}" (${eventKey}) was permanently purged from all databases.`, 'success');
+      renderOwnerPortal();
+    } catch (err) {
+      showToast(`Failed to purge: ${err.message}`, 'error');
+    }
+  };
 
   window.openRentalApprovalModal = function(rentalId) {
     const rentals = CS_Store.getPlatformRentals();
@@ -3428,6 +3699,50 @@
         const tabEvents = document.getElementById('tab-btn-owner-events');
         if (tabEvents) tabEvents.click();
         renderOwnerPortal();
+      });
+    }
+
+    // Screen Lock Timer & Owner Security PIN Settings (Requirement 7)
+    const pinInput = document.getElementById('owner-security-pin-input');
+    const btnSavePin = document.getElementById('btn-save-owner-pin');
+    const timerSelect = document.getElementById('select-owner-lock-timer');
+    const btnManualLock = document.getElementById('btn-owner-manual-lock');
+
+    if (pinInput && CS_Store.getOwnerPin) {
+      pinInput.value = CS_Store.getOwnerPin();
+    }
+    if (timerSelect && CS_Store.getOwnerLockTimer) {
+      timerSelect.value = String(CS_Store.getOwnerLockTimer());
+    }
+
+    if (btnSavePin) {
+      btnSavePin.addEventListener('click', () => {
+        const pin = (pinInput ? pinInput.value : '').trim();
+        if (!/^\d{4,8}$/.test(pin)) {
+          showToast('Owner Security PIN must be between 4 and 8 digits.', 'error');
+          if (pinInput) pinInput.focus();
+          return;
+        }
+        CS_Store.setOwnerPin(pin);
+        if (typeof CS_Audio !== 'undefined' && CS_Audio.handshakeSuccess) CS_Audio.handshakeSuccess();
+        showToast(`Owner Console Security PIN saved: ${pin}`, 'success');
+      });
+    }
+
+    if (timerSelect) {
+      timerSelect.addEventListener('change', () => {
+        const sec = parseInt(timerSelect.value, 10) || 0;
+        CS_Store.setOwnerLockTimer(sec);
+        if (typeof showToast === 'function') {
+          showToast(sec === 0 ? 'Owner Console auto-lock disabled.' : `Auto-lock timer set to ${sec / 60} min.`, 'info');
+        }
+        resetIdleActivity();
+      });
+    }
+
+    if (btnManualLock) {
+      btnManualLock.addEventListener('click', () => {
+        lockWorkspace();
       });
     }
 
@@ -3786,12 +4101,6 @@
       initModals();
       registerServiceWorker();
 
-      // Hook Firebase authentication redirect & state listeners
-      const authHandled = await initFirebaseAuthListener();
-      if (authHandled) {
-        return;
-      }
-
       // Triple tap logo on landing for direct owner login
       let logoClicks = 0;
       let logoTimer = null;
@@ -3811,8 +4120,9 @@
 
       window.addEventListener('hashchange', checkUrlHashOwner);
 
-      // Check if there was an active session
+      // Check if there was an active session (Requirement 6: Persistent Session / One-Time Login)
       const session = CS_Store.getSession();
+      let hasResumedSession = false;
       if (session && session.role && session.eventKey) {
         state.eventKey = session.eventKey;
         state.role = session.role;
@@ -3822,21 +4132,28 @@
 
         if (session.role === 'OWNER' && CS_Store.isPlatformOwner(session.user && session.user.email)) {
           navigateTo('owner-portal');
+          hasResumedSession = true;
         } else if (session.role === 'POS' && state.counterId) {
           navigateTo('pos');
+          hasResumedSession = true;
         } else if (session.role === 'STOCKROOM') {
           navigateTo('stockroom');
+          hasResumedSession = true;
         } else if (session.role === 'ADMIN') {
           navigateTo('admin');
-        } else {
-          navigateTo('landing');
+          hasResumedSession = true;
         }
-      } else {
+      }
+
+      if (!hasResumedSession) {
         navigateTo('landing');
       }
 
       // Check URL hash (#owner)
       checkUrlHashOwner();
+
+      // Hook Firebase authentication redirect & state listeners in background
+      initFirebaseAuthListener().catch(err => console.warn("[CounterSync Auth] Init listener error:", err));
     } catch (err) {
       console.error("CounterSync initialization error:", err);
     }
