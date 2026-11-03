@@ -95,8 +95,52 @@ class CounterSyncStore {
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
       this._broadcast('SYNC', { timestamp: Date.now() });
       this._notifySubscribers('LOCAL_SAVE', null);
+
+      // Real-time Cloud Synchronization via Firebase Firestore
+      if (typeof window !== 'undefined' && window.CS_Firebase && window.CS_Firebase.isReady) {
+        const activeKey = this.getActiveEventKey();
+        const eventData = data.events ? data.events[activeKey] : null;
+        if (eventData) {
+          window.CS_Firebase.syncEventToCloud(activeKey, eventData);
+        }
+      }
     } catch (err) {
       console.error("Failed to save store:", err);
+    }
+  }
+
+  // --- Real-time Firestore Cloud Synchronization (Section 3 & 5) ---
+  initCloudSync(eventKey) {
+    if (typeof window === 'undefined' || !window.CS_Firebase) return;
+    const key = (eventKey || this.getActiveEventKey()).toUpperCase().trim();
+
+    // Listen to real-time changes from Firestore (onSnapshot)
+    window.CS_Firebase.listenToEvent(key, (cloudData, hasPendingWrites) => {
+      if (!cloudData) return;
+      this.updateEventFromCloud(key, cloudData);
+      this._notifySubscribers('CLOUD_SYNC', { eventKey: key, hasPendingWrites });
+    });
+  }
+
+  updateEventFromCloud(eventKey, cloudData) {
+    try {
+      const data = this.getData();
+      const cleanKey = eventKey.toUpperCase().trim();
+      const localEvent = data.events[cleanKey];
+
+      // Merge remote state from Firestore
+      if (cloudData) {
+        data.events[cleanKey] = {
+          ...(localEvent || {}),
+          ...cloudData
+        };
+
+        // Persist to local storage for instant offline boot
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+        this._broadcast('SYNC', { timestamp: Date.now(), source: 'CLOUD' });
+      }
+    } catch (err) {
+      console.error("[CounterSync Store] Error merging cloud data:", err);
     }
   }
 

@@ -2882,6 +2882,30 @@ body:not(.light-theme) .staff-role-pill {
   padding: 5px 12px;
   border-radius: 9999px;
   border: 1px solid rgba(16, 185, 129, 0.25);
+  transition: all var(--transition-fast);
+}
+
+.synced-status-pill.offline {
+  background: rgba(245, 158, 11, 0.12) !important;
+  color: #F59E0B !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+.synced-status-pill.offline .green-sync-dot {
+  background: #F59E0B !important;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6) !important;
+}
+
+.synced-status-pill.syncing {
+  background: rgba(0, 102, 255, 0.12) !important;
+  color: #0066FF !important;
+  border-color: rgba(0, 102, 255, 0.3) !important;
+}
+
+.synced-status-pill.syncing .green-sync-dot {
+  background: #0066FF !important;
+  box-shadow: 0 0 6px rgba(0, 102, 255, 0.6) !important;
+  animation: pulseSubtle 1s infinite ease-in-out;
 }
 
 .green-sync-dot {

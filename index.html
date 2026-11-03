@@ -22,7 +22,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800;900&family=Manjari:wght@400;700&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- Bulletproof Standalone CSS -->
-  <link rel="stylesheet" href="./css/style.css?v=14">
+  <link rel="stylesheet" href="./css/style.css?v=15">
 </head>
 <body>
   <div id="app">
@@ -100,13 +100,13 @@
               <div class="intent-arrow">Staff Gateway →</div>
             </div>
 
-            <div class="intent-card" id="card-intent-organizer" role="button" tabindex="0" onclick="if(window.openHostEvent) window.openHostEvent(); else if(window.CounterSyncApp && window.CounterSyncApp.openHostEvent) window.CounterSyncApp.openHostEvent();">
+            <div class="intent-card" id="card-intent-organizer" role="button" tabindex="0" onclick="if(window.handleHostEventClick) window.handleHostEventClick(); else if(window.openHostEvent) window.openHostEvent();">
               <div>
                 <div class="intent-icon">👑</div>
                 <div class="intent-title">Host an Event</div>
                 <div class="intent-desc">For organizers and Super Admins to audit registers, allocate books, and configure counters.</div>
               </div>
-              <div class="intent-arrow">Master Portal →</div>
+              <div class="intent-arrow">Google Sign-In →</div>
             </div>
           </div>
 
@@ -1581,9 +1581,14 @@
   </div>
 
   <!-- Scripts -->
-  <script src="./js/qrcode.js?v=14"></script>
-  <script src="./js/seed.js?v=14"></script>
-  <script src="./js/store.js?v=14"></script>
-  <script src="./js/app.js?v=14"></script>
+  <!-- Firebase v10 Compat SDK (App, Auth, Firestore) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="./js/firebase-config.js?v=15"></script>
+  <script src="./js/qrcode.js?v=15"></script>
+  <script src="./js/seed.js?v=15"></script>
+  <script src="./js/store.js?v=15"></script>
+  <script src="./js/app.js?v=15"></script>
 </body>
 </html>

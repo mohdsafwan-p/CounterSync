@@ -112,6 +112,8 @@
     el.appHeader = document.getElementById('app-header');
     el.headerContextBadge = document.getElementById('header-context-badge');
     el.headerEventLabel = document.getElementById('header-event-label');
+    el.headerStaffPill = document.getElementById('header-staff-pill');
+    el.headerSyncPill = document.getElementById('header-sync-pill');
     el.idleTimerDisplay = document.getElementById('idle-timer-display');
     el.idleSeconds = document.getElementById('idle-seconds');
     el.btnQuickLock = document.getElementById('btn-quick-lock');
@@ -285,6 +287,26 @@
     el.btnSubmitUnlock = document.getElementById('btn-submit-unlock');
   }
 
+  // --- Real-time Sync Indicator State Helper ---
+  function updateSyncIndicator(status, message) {
+    if (!el.headerSyncPill) return;
+    const label = el.headerSyncPill.querySelector('span:not(.green-sync-dot)');
+    
+    el.headerSyncPill.classList.remove('offline', 'syncing');
+
+    if (status === 'offline' || !navigator.onLine) {
+      el.headerSyncPill.classList.add('offline');
+      if (label) label.textContent = message || 'Offline Ready';
+    } else if (status === 'syncing') {
+      el.headerSyncPill.classList.add('syncing');
+      if (label) label.textContent = message || 'Syncing...';
+    } else {
+      if (label) {
+        label.textContent = message || (window.CS_Firebase && window.CS_Firebase.isReady ? 'Cloud Live' : 'Synced');
+      }
+    }
+  }
+
   // --- View Switcher ---
   function navigateTo(viewName) {
     state.currentView = viewName;
@@ -296,6 +318,10 @@
     } else {
       el.appHeader.classList.remove('hidden');
       startIdleTimer();
+      if (state.eventKey) {
+        CS_Store.initCloudSync(state.eventKey);
+      }
+      updateSyncIndicator(navigator.onLine ? 'synced' : 'offline');
     }
 
     // Toggle main sections
@@ -559,9 +585,43 @@
       if (el.landingIntents) el.landingIntents.classList.remove('hidden');
     }
 
+    // Google Sign-In & Organizer Host Event Flow
+    async function handleHostEventClick() {
+      if (window.CS_Firebase && window.CS_Firebase.isReady) {
+        try {
+          showToast('Connecting to Google Identity Services...', 'info');
+          const user = await window.CS_Firebase.signInWithGoogle();
+          if (user) {
+            state.eventKey = state.eventKey || 'CS2026';
+            state.role = 'ADMIN';
+            CS_Store.setSession({
+              role: 'ADMIN',
+              eventKey: state.eventKey,
+              user: {
+                displayName: user.displayName,
+                email: user.email,
+                photoURL: user.photoURL,
+                uid: user.uid
+              }
+            });
+            CS_Store.initCloudSync(state.eventKey);
+            CS_Audio.handshakeSuccess();
+            showToast(`Welcome, ${user.displayName || user.email}! Authenticated as Super Admin`, 'success');
+            navigateTo('admin');
+            return;
+          }
+        } catch (err) {
+          console.warn("Google Sign-In notice:", err);
+          showToast(err.message || 'Google Sign-In canceled', 'error');
+        }
+      }
+      openHostEvent();
+    }
+
     // Expose on window for fail-safe direct inline click triggers
     window.openJoinEvent = openJoinEvent;
     window.openHostEvent = openHostEvent;
+    window.handleHostEventClick = handleHostEventClick;
     window.backToIntents = backToIntents;
     window.handleValidateKey = handleValidateKey;
     window.handleEnterWorkspace = handleEnterWorkspace;
@@ -569,6 +629,7 @@
     window.CounterSyncApp = {
       openJoinEvent,
       openHostEvent,
+      handleHostEventClick,
       backToIntents,
       handleValidateKey,
       handleEnterWorkspace,
@@ -591,11 +652,11 @@
     if (el.cardIntentOrganizer) {
       el.cardIntentOrganizer.addEventListener('click', (e) => {
         e.preventDefault();
-        openHostEvent();
+        handleHostEventClick();
       });
       el.cardIntentOrganizer.addEventListener('touchend', (e) => {
         e.preventDefault();
-        openHostEvent();
+        handleHostEventClick();
       }, { passive: false });
     }
 
@@ -684,9 +745,37 @@
 
     // Google Sign-In Flow Hook
     if (el.btnGoogleAuth) {
-      el.btnGoogleAuth.addEventListener('click', () => {
-        const modal = document.getElementById('modal-google-auth');
-        if (modal) modal.classList.remove('hidden');
+      el.btnGoogleAuth.addEventListener('click', async () => {
+        if (window.CS_Firebase && window.CS_Firebase.isReady) {
+          try {
+            showToast('Connecting to Google Identity Services...', 'info');
+            const user = await window.CS_Firebase.signInWithGoogle();
+            if (user) {
+              state.eventKey = state.eventKey || 'CS2026';
+              state.role = 'ADMIN';
+              CS_Store.setSession({
+                role: 'ADMIN',
+                eventKey: state.eventKey,
+                user: {
+                  displayName: user.displayName,
+                  email: user.email,
+                  photoURL: user.photoURL,
+                  uid: user.uid
+                }
+              });
+              CS_Store.initCloudSync(state.eventKey);
+              CS_Audio.handshakeSuccess();
+              showToast(`Welcome, ${user.displayName || user.email}! Authenticated as Super Admin`, 'success');
+              navigateTo('admin');
+            }
+          } catch (err) {
+            console.warn("Google Sign-In notice:", err);
+            showToast(err.message || 'Google Sign-In canceled', 'error');
+          }
+        } else {
+          const modal = document.getElementById('modal-google-auth');
+          if (modal) modal.classList.remove('hidden');
+        }
       });
     }
 
@@ -698,6 +787,7 @@
         state.eventKey = 'CS2026';
         state.role = 'ADMIN';
         CS_Store.setSession({ role: 'ADMIN', eventKey: 'CS2026' });
+        CS_Store.initCloudSync('CS2026');
         CS_Audio.handshakeSuccess();
         showToast('Google Sign-In Verified: Authenticated as Super Admin', 'success');
         navigateTo('admin');
@@ -706,8 +796,11 @@
 
     // Header Exit button
     if (el.btnHeaderLogout) {
-      el.btnHeaderLogout.addEventListener('click', () => {
+      el.btnHeaderLogout.addEventListener('click', async () => {
         if (confirm('Return to CounterSync Brand Gateway?')) {
+          if (window.CS_Firebase && typeof window.CS_Firebase.signOut === 'function') {
+            try { await window.CS_Firebase.signOut(); } catch (e) {}
+          }
           CS_Store.clearSession();
           state.role = null;
           state.counterId = null;
@@ -2900,6 +2993,19 @@
 
   // --- Real-time Local & Cross-Tab State Sync Listener ---
   CS_Store.subscribe((eventType, data) => {
+    if (eventType === 'CLOUD_SYNC') {
+      if (data && data.hasPendingWrites) {
+        updateSyncIndicator('syncing', 'Writing...');
+      } else {
+        updateSyncIndicator('synced', window.CS_Firebase && window.CS_Firebase.isReady ? 'Cloud Live' : 'Synced');
+      }
+    } else if (eventType === 'LOCAL_SAVE') {
+      if (window.CS_Firebase && window.CS_Firebase.isReady && navigator.onLine) {
+        updateSyncIndicator('syncing', 'Syncing...');
+        setTimeout(() => updateSyncIndicator('synced', 'Cloud Live'), 1000);
+      }
+    }
+
     if (state.currentView === 'pos') {
       renderPOSWorkspace();
     } else if (state.currentView === 'stockroom') {
@@ -2907,6 +3013,23 @@
     } else if (state.currentView === 'admin') {
       renderAdminDashboard();
     }
+  });
+
+  // --- Network Online / Offline Listeners for Fallback Sync ---
+  window.addEventListener('online', () => {
+    updateSyncIndicator('syncing', 'Reconnecting...');
+    if (state.eventKey) {
+      CS_Store.initCloudSync(state.eventKey);
+    }
+    setTimeout(() => {
+      updateSyncIndicator('synced', window.CS_Firebase && window.CS_Firebase.isReady ? 'Cloud Live' : 'Synced');
+      showToast('Cloud connection restored. Live sync active.', 'success');
+    }, 1200);
+  });
+
+  window.addEventListener('offline', () => {
+    updateSyncIndicator('offline', 'Offline Ready');
+    showToast('Offline Mode: Sales saved locally and will sync when reconnected.', 'info');
   });
 
   // --- Service Worker Registration for Offline PWA Field Deployment ---
@@ -2938,6 +3061,7 @@
         state.eventKey = session.eventKey;
         state.role = session.role;
         state.counterId = session.counterId || null;
+        CS_Store.initCloudSync(session.eventKey);
 
         if (session.role === 'POS' && state.counterId) {
           navigateTo('pos');

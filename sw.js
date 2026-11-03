@@ -3,12 +3,13 @@
  * Bulletproof offline asset caching for outdoor festival tents & remote fairgrounds.
  */
 
-const CACHE_NAME = 'countersync-cache-v14';
+const CACHE_NAME = 'countersync-cache-v15';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
   './css/style.css',
+  './js/firebase-config.js',
   './js/qrcode.js',
   './js/seed.js',
   './js/store.js',
