@@ -231,6 +231,55 @@
     el.inputVipVolunteer = document.getElementById('input-vip-volunteer');
     el.btnConfirmVipOk = document.getElementById('btn-confirm-vip-ok');
 
+    // Micro-Donation & Excess Tender
+    el.btnToggleDonationPane = document.getElementById('btn-toggle-donation-pane');
+    el.btnCloseDonationPane = document.getElementById('btn-close-donation-pane');
+    el.panelDonationExcess = document.getElementById('panel-donation-excess');
+    el.inputCashTendered = document.getElementById('input-cash-tendered');
+    el.displayChangeDue = document.getElementById('display-change-due');
+    el.chkKeepChangeDonation = document.getElementById('chk-keep-change-donation');
+    el.inputExtraDonation = document.getElementById('input-extra-donation');
+
+    // Inter-Counter Transfers Banner & Exchange Modal
+    el.posTransferBanner = document.getElementById('pos-transfer-banner');
+    el.posTransferHeading = document.getElementById('pos-transfer-heading');
+    el.posTransferDetails = document.getElementById('pos-transfer-details');
+    el.btnAcceptTransfer = document.getElementById('btn-accept-transfer');
+    el.btnRejectTransfer = document.getElementById('btn-reject-transfer');
+    el.modalCounterExchange = document.getElementById('modal-counter-exchange');
+    el.btnTypeBooks = document.getElementById('btn-type-books');
+    el.btnTypeCash = document.getElementById('btn-type-cash');
+    el.exchangeTargetCounter = document.getElementById('exchange-target-counter');
+    el.labelExchangeQty = document.getElementById('label-exchange-qty');
+    el.exchangeAvailHint = document.getElementById('exchange-avail-hint');
+    el.exchangeQty = document.getElementById('exchange-qty');
+    el.exchangeNotes = document.getElementById('exchange-notes');
+    el.btnSubmitCounterExchange = document.getElementById('btn-submit-counter-exchange');
+
+    // Confirmation Modal Elements
+    el.confirmModalBookPrice = document.getElementById('confirm-modal-book-price');
+    el.confirmModalDonationRow = document.getElementById('confirm-modal-donation-row');
+    el.confirmModalDonation = document.getElementById('confirm-modal-donation');
+    el.confirmModalChangeRow = document.getElementById('confirm-modal-change-row');
+    el.confirmModalChange = document.getElementById('confirm-modal-change');
+    el.confirmModalBuyer = document.getElementById('confirm-modal-buyer');
+
+    // Fast Denomination Reset
+    el.btnResetDenominations = document.getElementById('btn-reset-denominations');
+
+    // Disaster Recovery Restore Modal
+    el.inputRestoreBackup = document.getElementById('input-restore-backup');
+    el.modalRestoreConflict = document.getElementById('modal-restore-conflict');
+    el.restoreSummaryEvent = document.getElementById('restore-summary-event');
+    el.restoreSummaryCounter = document.getElementById('restore-summary-counter');
+    el.restoreSummaryTime = document.getElementById('restore-summary-time');
+    el.chipRestoreSales = document.getElementById('chip-restore-sales');
+    el.chipRestoreDonations = document.getElementById('chip-restore-donations');
+    el.chipRestoreTransfers = document.getElementById('chip-restore-transfers');
+    el.btnConfirmHydrate = document.getElementById('btn-confirm-hydrate');
+    el.btnTriggerRestoreJson = document.getElementById('btn-trigger-restore-json');
+    el.btnTriggerRestoreAdmin = document.getElementById('btn-trigger-restore-admin');
+
     el.lockoutScreen = document.getElementById('lockout-screen');
     el.inputUnlockPin = document.getElementById('input-unlock-pin');
     el.btnSubmitUnlock = document.getElementById('btn-submit-unlock');
@@ -1008,51 +1057,86 @@
       });
     }
 
-    // Inter-Counter Stock Transfer Button (Tab 4 End of Day)
-    if (el.btnOpenTransferAction) {
-      el.btnOpenTransferAction.addEventListener('click', () => {
-        const event = CS_Store.getEvent(state.eventKey);
-        const otherCounters = (event ? event.counters : []).filter(c => c.id !== state.counterId);
-        if (otherCounters.length === 0) {
-          showToast('No other active counters available for peer transfer.', 'info');
-          return;
-        }
-        const counterListStr = otherCounters.map((c, i) => `${i + 1}: ${c.name} (Stock: ${c.currentStock})`).join('\n');
-        const choice = prompt(`Select target counter for stock transfer:\n${counterListStr}`, '1');
-        if (!choice) return;
-        const targetIndex = parseInt(choice, 10) - 1;
-        const destCounter = otherCounters[targetIndex] || otherCounters[0];
-        if (!destCounter) return;
-
-        const countStr = prompt(`How many copies to transfer to ${destCounter.name}?`, '10');
-        const transferCount = parseInt(countStr, 10) || 0;
-        if (transferCount <= 0) return;
-
-        const pin = prompt(`Enter Counter PIN or Admin PIN to authorize transfer:`);
-        const activeCounter = CS_Store.getCounter(state.eventKey, state.counterId);
-        if (!pin || (pin !== activeCounter.pin && pin !== event.adminPin && pin !== '9999')) {
-          CS_Audio.alertWarning();
-          showToast('Invalid Authorizing PIN', 'error');
-          return;
-        }
-
-        try {
-          CS_Store.transferStock({
-            eventKey: state.eventKey,
-            fromCounterId: state.counterId,
-            toCounterId: destCounter.id,
-            copies: transferCount,
-            authorizedBy: `${activeCounter.volunteers} (PIN Verified)`,
-            reason: 'Festival rush rebalancing'
-          });
-          CS_Audio.handshakeSuccess();
-          showToast(`Transferred ${transferCount} copies to ${destCounter.name}`, 'success');
-          renderPOSWorkspace();
-        } catch (err) {
-          CS_Audio.alertWarning();
-          showToast(err.message, 'error');
+    // Micro-Donation & Excess Tender Toggle (Section 1.1)
+    if (el.btnToggleDonationPane && el.panelDonationExcess) {
+      el.btnToggleDonationPane.addEventListener('click', () => {
+        const isHidden = el.panelDonationExcess.classList.toggle('hidden');
+        el.btnToggleDonationPane.classList.toggle('active', !isHidden);
+        if (!isHidden && el.inputCashTendered) {
+          setTimeout(() => el.inputCashTendered.focus(), 60);
         }
       });
+    }
+
+    if (el.btnCloseDonationPane && el.panelDonationExcess) {
+      el.btnCloseDonationPane.addEventListener('click', () => {
+        el.panelDonationExcess.classList.add('hidden');
+        if (el.btnToggleDonationPane) el.btnToggleDonationPane.classList.remove('active');
+      });
+    }
+
+    // Fast Tender Preset Pills
+    document.querySelectorAll('.btn-tender-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.btn-tender-chip').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const preset = btn.dataset.preset;
+        const currentBookPrice = state.currentBilling ? state.currentBilling.bookTotal : 100;
+        if (preset === 'exact') {
+          if (el.inputCashTendered) el.inputCashTendered.value = currentBookPrice;
+        } else {
+          if (el.inputCashTendered) el.inputCashTendered.value = preset;
+        }
+        updateBillingCalculation();
+        triggerHaptic('light');
+      });
+    });
+
+    if (el.inputCashTendered) {
+      el.inputCashTendered.addEventListener('input', () => {
+        document.querySelectorAll('.btn-tender-chip').forEach(b => b.classList.remove('active'));
+        updateBillingCalculation();
+      });
+    }
+
+    if (el.chkKeepChangeDonation) {
+      el.chkKeepChangeDonation.addEventListener('change', () => {
+        updateBillingCalculation();
+        triggerHaptic('light');
+      });
+    }
+
+    if (el.inputExtraDonation) {
+      el.inputExtraDonation.addEventListener('input', () => {
+        updateBillingCalculation();
+      });
+    }
+
+    // Inter-Counter Stock Transfer Modal (Tab 4 End of Day - Section 1.2)
+    if (el.btnOpenTransferAction) {
+      el.btnOpenTransferAction.addEventListener('click', openCounterExchangeModal);
+    }
+
+    if (el.btnTypeBooks) {
+      el.btnTypeBooks.addEventListener('click', () => {
+        state.activeExchangeType = 'BOOKS';
+        if (el.btnTypeBooks) el.btnTypeBooks.classList.add('active');
+        if (el.btnTypeCash) el.btnTypeCash.classList.remove('active');
+        updateExchangeAvailableHint();
+      });
+    }
+
+    if (el.btnTypeCash) {
+      el.btnTypeCash.addEventListener('click', () => {
+        state.activeExchangeType = 'CASH';
+        if (el.btnTypeCash) el.btnTypeCash.classList.add('active');
+        if (el.btnTypeBooks) el.btnTypeBooks.classList.remove('active');
+        updateExchangeAvailableHint();
+      });
+    }
+
+    if (el.btnSubmitCounterExchange) {
+      el.btnSubmitCounterExchange.addEventListener('click', submitCounterExchange);
     }
 
     // Two-Way Stock Dispatch Handshake Button
@@ -1080,15 +1164,28 @@
         const counter = CS_Store.getCounter(state.eventKey, state.counterId);
         if (!counter) return;
 
-        const qty = state.selectedQty || 1;
-        if (counter.currentStock < qty) {
+        updateBillingCalculation();
+        const billing = state.currentBilling || {
+          qty: state.selectedQty || 1,
+          bookTotal: (state.selectedQty || 1) * (event.unitPrice || 100),
+          totalDonation: 0,
+          grandTotal: (state.selectedQty || 1) * (event.unitPrice || 100),
+          tender: (state.selectedQty || 1) * (event.unitPrice || 100),
+          changeDue: 0
+        };
+
+        const qty = billing.qty;
+        if (qty > 0 && counter.currentStock < qty) {
           CS_Audio.alertWarning();
           showToast(`Cannot sell ${qty} copies! Only ${counter.currentStock} remaining in shelf stock.`, 'error');
           return;
         }
 
-        const unitPrice = event.unitPrice || 100;
-        const total = qty * unitPrice;
+        if (qty === 0 && billing.totalDonation <= 0) {
+          CS_Audio.alertWarning();
+          showToast('Please select at least 1 book copy or enter a donation amount.', 'error');
+          return;
+        }
 
         let buyerName = '';
         let buyerPhone = '';
@@ -1105,16 +1202,22 @@
 
         state.pendingSaleData = {
           qty,
-          total,
+          unitPrice: event.unitPrice || 100,
+          bookTotal: billing.bookTotal,
+          donationAmount: billing.totalDonation,
+          total: billing.grandTotal,
+          cashReceived: billing.tender,
+          changeGiven: billing.changeDue,
           mode: state.selectedPayMode,
-          buyerName,
+          buyerName: buyerName || (qty === 0 ? 'Patron Donor' : 'Direct Buyer'),
           buyerPhone
         };
 
         if (state.selectedPayMode === 'CASH') {
-          executeSale(state.pendingSaleData);
+          // Open Explicit Confirmation Modal (Section 1.3)
+          openCashConfirmModal(state.pendingSaleData);
         } else {
-          openUpiQrModal(counter, total);
+          openUpiQrModal(counter, billing.grandTotal);
         }
       });
     }
@@ -1152,12 +1255,37 @@
       inp.addEventListener('input', updateDenominationCalculations);
     });
 
-    // Save Backup JSON in End of Day
+    // Fast Denomination Reset (Section 1.4)
+    if (el.btnResetDenominations) {
+      el.btnResetDenominations.addEventListener('click', () => {
+        const denomInps = document.querySelectorAll('.denom-input');
+        denomInps.forEach(i => i.value = 0);
+        updateDenominationCalculations();
+        triggerHaptic('medium');
+        showToast('Denominations reset to zero.', 'info');
+      });
+    }
+
+    // Save Backup JSON in End of Day (Section 2 & 3)
     const btnBackup = document.getElementById('btn-export-counter-json');
     if (btnBackup) {
       btnBackup.addEventListener('click', () => {
-        downloadJsonBackup();
+        downloadJsonBackup(state.counterId);
       });
+    }
+
+    // Disaster Recovery JSON Restore Triggers & Handlers
+    if (el.btnTriggerRestoreJson && el.inputRestoreBackup) {
+      el.btnTriggerRestoreJson.addEventListener('click', () => el.inputRestoreBackup.click());
+    }
+    if (el.btnTriggerRestoreAdmin && el.inputRestoreBackup) {
+      el.btnTriggerRestoreAdmin.addEventListener('click', () => el.inputRestoreBackup.click());
+    }
+    if (el.inputRestoreBackup) {
+      el.inputRestoreBackup.addEventListener('change', handleBackupFileSelect);
+    }
+    if (el.btnConfirmHydrate) {
+      el.btnConfirmHydrate.addEventListener('click', executeBackupHydration);
     }
 
     // Lock Screen in End of Day
@@ -1199,36 +1327,122 @@
   function updateBillingCalculation() {
     const event = CS_Store.getEvent(state.eventKey);
     const unitPrice = event ? (event.unitPrice || 100) : 100;
-    const qty = state.selectedQty || 1;
-    const total = qty * unitPrice;
+    const qty = state.selectedQty !== undefined ? state.selectedQty : 1;
+    const bookTotal = qty * unitPrice;
+
+    // Direct discretionary donation
+    const extraDonation = el.inputExtraDonation ? (parseInt(el.inputExtraDonation.value, 10) || 0) : 0;
+    // Customer cash tendered
+    const tender = el.inputCashTendered ? (parseInt(el.inputCashTendered.value, 10) || 0) : 0;
+    const keepChange = el.chkKeepChangeDonation ? el.chkKeepChangeDonation.checked : false;
+
+    let changeDue = 0;
+    let changeAsDonation = 0;
+
+    if (tender > 0 && tender > bookTotal) {
+      const delta = tender - bookTotal;
+      if (keepChange) {
+        changeDue = 0;
+        changeAsDonation = delta;
+      } else {
+        changeDue = delta;
+        changeAsDonation = 0;
+      }
+    }
+
+    if (el.displayChangeDue) {
+      el.displayChangeDue.textContent = `₹${changeDue.toLocaleString('en-IN')}`;
+    }
+
+    const totalDonation = changeAsDonation + extraDonation;
+    const grandTotal = bookTotal + totalDonation;
+
+    state.currentBilling = {
+      qty,
+      bookTotal,
+      extraDonation,
+      changeAsDonation,
+      totalDonation,
+      tender: tender > 0 ? tender : grandTotal,
+      changeDue,
+      grandTotal
+    };
 
     if (el.btnConfirmSaleLabel) {
-      el.btnConfirmSaleLabel.textContent = `CONFIRM SALE (${qty} ${qty === 1 ? 'Copy' : 'Copies'} • ₹${total.toLocaleString('en-IN')})`;
+      if (qty === 0 && totalDonation > 0) {
+        el.btnConfirmSaleLabel.textContent = `CONFIRM DONATION (₹${totalDonation.toLocaleString('en-IN')})`;
+      } else if (totalDonation > 0) {
+        el.btnConfirmSaleLabel.textContent = `CONFIRM SALE (${qty} ${qty === 1 ? 'Copy' : 'Copies'} + ₹${totalDonation} Donation • ₹${grandTotal.toLocaleString('en-IN')})`;
+      } else {
+        el.btnConfirmSaleLabel.textContent = `CONFIRM SALE (${qty} ${qty === 1 ? 'Copy' : 'Copies'} • ₹${bookTotal.toLocaleString('en-IN')})`;
+      }
     }
   }
 
-  function openUpiQrModal(counter, total) {
-    if (el.qrModalAmount) el.qrModalAmount.textContent = `₹${total.toLocaleString('en-IN')}`;
-    if (el.qrModalUpiId) el.qrModalUpiId.textContent = counter.upiId;
-
-    // Build standard clean UPI payment URI
-    const upiUri = `upi://pay?pa=${counter.upiId}&pn=${encodeURIComponent(counter.upiName || counter.name)}&am=${total}&cu=INR&tn=${encodeURIComponent('CounterSync-' + counter.id)}`;
-    state.activeUpiUri = upiUri;
-
-    // Render offline pure JS QR code
-    if (el.upiQrRenderBox) {
-      el.upiQrRenderBox.innerHTML = '';
-      new QRCode(el.upiQrRenderBox, {
-        text: upiUri,
-        width: 240,
-        height: 240,
-        colorDark: '#0B132B',
-        colorLight: '#FFFFFF'
-      });
+  function openCashConfirmModal(saleData) {
+    if (!el.modalConfirmSale) {
+      executeSale(saleData);
+      return;
     }
 
-    CS_Audio.playTone(660, 'sine', 0.12);
-    if (el.modalUpiQr) el.modalUpiQr.classList.remove('hidden');
+    if (el.confirmModalQty) {
+      el.confirmModalQty.textContent = saleData.qty === 0 ? '0 Copies (Donation Only)' : `${saleData.qty} ${saleData.qty === 1 ? 'Copy' : 'Copies'}`;
+    }
+    if (el.confirmModalBookPrice) {
+      el.confirmModalBookPrice.textContent = `₹${saleData.bookTotal.toLocaleString('en-IN')}`;
+    }
+    if (el.confirmModalDonationRow && el.confirmModalDonation) {
+      if (saleData.donationAmount > 0) {
+        el.confirmModalDonationRow.classList.remove('hidden');
+        el.confirmModalDonation.textContent = `₹${saleData.donationAmount.toLocaleString('en-IN')}`;
+      } else {
+        el.confirmModalDonationRow.classList.add('hidden');
+      }
+    }
+    if (el.confirmModalTotal) {
+      el.confirmModalTotal.textContent = `₹${saleData.total.toLocaleString('en-IN')}`;
+    }
+    if (el.confirmModalChangeRow && el.confirmModalChange) {
+      if (saleData.changeGiven > 0) {
+        el.confirmModalChangeRow.classList.remove('hidden');
+        el.confirmModalChange.textContent = `₹${saleData.changeGiven.toLocaleString('en-IN')}`;
+      } else {
+        el.confirmModalChangeRow.classList.add('hidden');
+      }
+    }
+    if (el.confirmModalBuyer) {
+      el.confirmModalBuyer.textContent = saleData.buyerName || 'Direct Buyer';
+    }
+
+    el.modalConfirmSale.classList.remove('hidden');
+    CS_Audio.playTone(520, 'sine', 0.08);
+
+    function handleKeydown(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commitCashSale();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeCashModal();
+      }
+    }
+
+    function commitCashSale() {
+      document.removeEventListener('keydown', handleKeydown);
+      el.modalConfirmSale.classList.add('hidden');
+      executeSale(state.pendingSaleData);
+    }
+
+    function closeCashModal() {
+      document.removeEventListener('keydown', handleKeydown);
+      el.modalConfirmSale.classList.add('hidden');
+    }
+
+    document.addEventListener('keydown', handleKeydown);
+
+    if (el.btnFinalizeSaleConfirmed) {
+      el.btnFinalizeSaleConfirmed.onclick = commitCashSale;
+    }
   }
 
   function executeSale(saleData) {
@@ -1239,16 +1453,27 @@
         copies: saleData.qty,
         paymentMode: saleData.mode,
         buyerName: saleData.buyerName,
-        buyerPhone: saleData.buyerPhone
+        buyerPhone: saleData.buyerPhone,
+        cashReceived: saleData.cashReceived,
+        changeGiven: saleData.changeGiven,
+        donationAmount: saleData.donationAmount,
+        isConfirmed: true
       });
 
       CS_Audio.cashChime();
-      showToast(`Sale Recorded! ${saleData.qty} copies (₹${saleData.total}) via ${saleData.mode}`, 'success');
+      const successMsg = saleData.qty === 0
+        ? `Donation Recorded! ₹${saleData.donationAmount} via ${saleData.mode}`
+        : `Sale Recorded! ${saleData.qty} copies (₹${saleData.total}) via ${saleData.mode}`;
+      showToast(successMsg, 'success');
 
       // Reset billing form
       if (el.inputBuyerCombined) el.inputBuyerCombined.value = '';
       if (el.inputBuyerName) el.inputBuyerName.value = '';
       if (el.inputBuyerPhone) el.inputBuyerPhone.value = '';
+      if (el.inputCashTendered) el.inputCashTendered.value = '';
+      if (el.inputExtraDonation) el.inputExtraDonation.value = '';
+      if (el.chkKeepChangeDonation) el.chkKeepChangeDonation.checked = false;
+      document.querySelectorAll('.btn-tender-chip').forEach(b => b.classList.remove('active'));
       state.selectedQty = 1;
       if (el.inputBillingQty) el.inputBillingQty.value = 1;
       document.querySelectorAll('.btn-qty-card').forEach(b => b.classList.toggle('active', b.dataset.qty === '1'));
@@ -1256,6 +1481,162 @@
       updateBillingCalculation();
 
       renderPOSWorkspace();
+    } catch (err) {
+      CS_Audio.alertWarning();
+      showToast(err.message, 'error');
+    }
+  }
+
+  // Inter-Counter Exchange Handlers (Section 1.2)
+  function openCounterExchangeModal() {
+    const modal = document.getElementById('modal-counter-exchange');
+    const select = document.getElementById('exchange-target-counter');
+    const event = CS_Store.getEvent(state.eventKey);
+    const counter = CS_Store.getCounter(state.eventKey, state.counterId);
+    if (!modal || !event || !counter) return;
+
+    state.activeExchangeType = 'BOOKS';
+    if (el.btnTypeBooks) el.btnTypeBooks.classList.add('active');
+    if (el.btnTypeCash) el.btnTypeCash.classList.remove('active');
+
+    if (select) {
+      select.innerHTML = '';
+      (event.counters || []).forEach(c => {
+        if (c.id !== state.counterId) {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = `${c.name} (${c.volunteers || 'Staff'})`;
+          select.appendChild(opt);
+        }
+      });
+    }
+
+    updateExchangeAvailableHint();
+    modal.classList.remove('hidden');
+  }
+
+  function updateExchangeAvailableHint() {
+    const hint = document.getElementById('exchange-avail-hint');
+    const label = document.getElementById('label-exchange-qty');
+    const counter = CS_Store.getCounter(state.eventKey, state.counterId);
+    if (!hint || !counter) return;
+
+    if (state.activeExchangeType === 'BOOKS') {
+      if (label) label.textContent = 'Number of Copies *';
+      hint.textContent = `Available: ${counter.currentStock} copies`;
+      hint.style.color = '#10B981';
+    } else {
+      if (label) label.textContent = 'Cash Float Amount (₹) *';
+      const metrics = CS_Store.getBalancedLedgerMetrics(state.eventKey, 'ALL');
+      const senderBrk = metrics ? metrics.counterBreakdown.find(b => b.id === counter.id) : null;
+      const cash = senderBrk ? senderBrk.cashCollection : 0;
+      hint.textContent = `Available Cash: ₹${cash.toLocaleString('en-IN')}`;
+      hint.style.color = '#0066FF';
+    }
+  }
+
+  function submitCounterExchange() {
+    const select = document.getElementById('exchange-target-counter');
+    const inputQty = document.getElementById('exchange-qty');
+    const inputNotes = document.getElementById('exchange-notes');
+    const toCounterId = select ? select.value : '';
+    const amount = inputQty ? parseInt(inputQty.value, 10) : 0;
+    const notes = inputNotes ? inputNotes.value.trim() : '';
+
+    if (!toCounterId) {
+      showToast('Please select a destination counter.', 'error');
+      return;
+    }
+    if (isNaN(amount) || amount <= 0) {
+      showToast('Please enter a valid positive quantity or amount.', 'error');
+      return;
+    }
+
+    try {
+      CS_Store.initiateInterCounterTransfer({
+        eventKey: state.eventKey,
+        fromCounterId: state.counterId,
+        toCounterId,
+        type: state.activeExchangeType || 'BOOKS',
+        amountOrQuantity: amount,
+        notes,
+        authorizedBy: el.posVolunteers ? el.posVolunteers.textContent.replace('Volunteers: ', '').trim() : 'Staff Volunteer'
+      });
+
+      CS_Audio.handshakeSuccess();
+      showToast('Transfer request sent! Held pending destination counter acceptance.', 'success');
+      const modal = document.getElementById('modal-counter-exchange');
+      if (modal) modal.classList.add('hidden');
+      if (inputQty) inputQty.value = '';
+      if (inputNotes) inputNotes.value = '';
+      renderPOSWorkspace();
+    } catch (err) {
+      CS_Audio.alertWarning();
+      showToast(err.message, 'error');
+    }
+  }
+
+  // Disaster Recovery JSON Restore Handlers (Section 2 & 3)
+  function handleBackupFileSelect(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const jsonStr = evt.target.result;
+        const payload = JSON.parse(jsonStr);
+
+        const eventName = payload.system_meta?.event_name || payload.event_snapshot?.name || 'Active Event';
+        const counterName = payload.system_meta?.source_counter_id || 'Master Export';
+        const timestamp = payload.system_meta?.backup_timestamp || payload.system_meta?.export_timestamp || new Date().toISOString();
+        const salesCount = (payload.sales || []).length;
+        const donCount = (payload.donations || []).length;
+        const trfCount = (payload.inter_counter_transfers || []).length;
+
+        if (el.restoreSummaryEvent) el.restoreSummaryEvent.textContent = eventName;
+        if (el.restoreSummaryCounter) el.restoreSummaryCounter.textContent = counterName;
+        if (el.restoreSummaryTime) el.restoreSummaryTime.textContent = new Date(timestamp).toLocaleString();
+        if (el.chipRestoreSales) el.chipRestoreSales.textContent = `${salesCount} Sales`;
+        if (el.chipRestoreDonations) el.chipRestoreDonations.textContent = `${donCount} Donations`;
+        if (el.chipRestoreTransfers) el.chipRestoreTransfers.textContent = `${trfCount} Transfers`;
+
+        state.pendingRestoreJson = jsonStr;
+
+        const modal = document.getElementById('modal-restore-conflict');
+        if (modal) modal.classList.remove('hidden');
+      } catch (err) {
+        CS_Audio.alertWarning();
+        showToast(`Invalid JSON backup: ${err.message}`, 'error');
+      } finally {
+        if (el.inputRestoreBackup) el.inputRestoreBackup.value = '';
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function executeBackupHydration() {
+    if (!state.pendingRestoreJson) return;
+    const policyRadio = document.querySelector('input[name="restore-policy"]:checked');
+    const policy = policyRadio ? policyRadio.value : 'MERGE';
+
+    try {
+      const result = CS_Store.restoreBackupJSON({
+        eventKey: state.eventKey,
+        jsonString: state.pendingRestoreJson,
+        policy
+      });
+
+      CS_Audio.handshakeSuccess();
+      showToast(`Hydration complete! Restored with ${policy} policy.`, 'success');
+      const modal = document.getElementById('modal-restore-conflict');
+      if (modal) modal.classList.add('hidden');
+      state.pendingRestoreJson = null;
+
+      // Re-render across views
+      renderPOSWorkspace();
+      if (state.currentView === 'admin') renderAdminDashboard();
+      if (state.currentView === 'stockroom') renderStockRoomWorkspace();
     } catch (err) {
       CS_Audio.alertWarning();
       showToast(err.message, 'error');
@@ -1327,6 +1708,60 @@
         if (el.posDispatchQty) el.posDispatchQty.textContent = inTransit.copies;
       } else {
         el.posDispatchBanner.classList.add('hidden');
+      }
+    }
+
+    // Two-Way Inter-Counter Transfer Banner (Section 1.2)
+    const pendingTransfers = CS_Store.getPendingTransfersForCounter(state.eventKey, counter.id);
+    if (el.posTransferBanner) {
+      if (pendingTransfers.length > 0) {
+        const trf = pendingTransfers[0];
+        el.posTransferBanner.classList.remove('hidden');
+        if (el.posTransferHeading) {
+          el.posTransferHeading.textContent = `⇄ Incoming Transfer from ${trf.fromCounterName || trf.fromCounterId}!`;
+        }
+        if (el.posTransferDetails) {
+          const itemText = trf.type === 'CASH' ? `₹${trf.amountOrQuantity} Cash Float` : `${trf.amountOrQuantity} Book Copies`;
+          el.posTransferDetails.textContent = `${trf.fromCounterName || 'Peer desk'} sent ${itemText}.${trf.notes ? ' Memo: "' + trf.notes + '"' : ''} Accept transfer?`;
+        }
+        if (el.btnAcceptTransfer) {
+          el.btnAcceptTransfer.onclick = () => {
+            try {
+              CS_Store.respondInterCounterTransfer({
+                eventKey: state.eventKey,
+                transferId: trf.transfer_id || trf.id,
+                action: 'ACCEPT',
+                authorizedBy: el.posVolunteers ? el.posVolunteers.textContent.replace('Volunteers: ', '').trim() : 'Staff Volunteer'
+              });
+              CS_Audio.handshakeSuccess();
+              showToast(`Transfer accepted! Added ${trf.type === 'CASH' ? '₹' + trf.amountOrQuantity : trf.amountOrQuantity + ' copies'}.`, 'success');
+              renderPOSWorkspace();
+            } catch (err) {
+              CS_Audio.alertWarning();
+              showToast(err.message, 'error');
+            }
+          };
+        }
+        if (el.btnRejectTransfer) {
+          el.btnRejectTransfer.onclick = () => {
+            try {
+              CS_Store.respondInterCounterTransfer({
+                eventKey: state.eventKey,
+                transferId: trf.transfer_id || trf.id,
+                action: 'REJECT',
+                authorizedBy: el.posVolunteers ? el.posVolunteers.textContent.replace('Volunteers: ', '').trim() : 'Staff Volunteer'
+              });
+              CS_Audio.playTone(300, 'square', 0.15);
+              showToast('Transfer rejected. Funds/stock returned to sender.', 'info');
+              renderPOSWorkspace();
+            } catch (err) {
+              CS_Audio.alertWarning();
+              showToast(err.message, 'error');
+            }
+          };
+        }
+      } else {
+        el.posTransferBanner.classList.add('hidden');
       }
     }
 
@@ -1664,16 +2099,28 @@
     showToast('Shift cash closing register submitted successfully!', 'success');
   }
 
-  function downloadJsonBackup() {
-    const jsonStr = CS_Store.exportBackupJSON(state.eventKey);
+  function downloadJsonBackup(counterId = null) {
+    const cid = counterId || state.counterId;
+    const jsonStr = CS_Store.exportBackupJSON(state.eventKey, cid);
+    if (!jsonStr) {
+      showToast('Could not generate backup file.', 'error');
+      return;
+    }
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `CounterSync-Backup-${state.eventKey}-${new Date().toISOString().slice(0, 10)}.json`;
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    const cleanCid = cid ? cid.toLowerCase().replace(/[^a-z0-9]/g, '_') : 'master';
+    a.download = `pos_backup_${cleanCid}_${ts}.json`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('Encrypted JSON backup file downloaded locally!', 'info');
+    CS_Audio.playTone(880, 'sine', 0.1);
+    showToast(`Backup exported: ${a.download}`, 'success');
   }
 
   // --- 3. Central Stock Room & Warehouse Management ---
@@ -2122,6 +2569,14 @@
     document.getElementById('kpi-preorder-ratio').textContent = `${metrics.fulfilledPreOrders} / ${metrics.fulfilledPreOrders + metrics.pendingPreOrders}`;
     document.getElementById('kpi-preorder-sub').textContent = `${metrics.fulfilledPreOrders} Delivered • ${metrics.pendingPreOrders} Pending`;
 
+    // Micro-Donations KPI (Section 1.1)
+    const kpiDonations = document.getElementById('kpi-donations-total');
+    const kpiDonationsSub = document.getElementById('kpi-donations-sub');
+    const totalDonations = metrics.totalDonations || 0;
+    const donCount = (event.donations || []).length;
+    if (kpiDonations) kpiDonations.textContent = `₹${totalDonations.toLocaleString('en-IN')}`;
+    if (kpiDonationsSub) kpiDonationsSub.textContent = `${donCount} ${donCount === 1 ? 'donation' : 'donations'} • Discretionary & waived change`;
+
     // 4.5 Live Counter Performance Table
     const tbody = document.getElementById('admin-counters-tbody');
     tbody.innerHTML = '';
@@ -2154,6 +2609,8 @@
     });
 
     renderAdminTransactionsRegister();
+    renderAdminDonationsLedger();
+    renderAdminTransfersAudit();
   }
 
   function renderAdminTransactionsRegister() {
@@ -2210,6 +2667,91 @@
         b.addEventListener('click', () => openVoidDialog(t.id));
       });
 
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderAdminDonationsLedger() {
+    const event = CS_Store.getEvent(state.eventKey);
+    const tbody = document.getElementById('admin-donations-tbody');
+    const countPill = document.getElementById('admin-donations-count-pill');
+    if (!tbody || !event) return;
+
+    let donations = event.donations || [];
+    if (state.adminFilterDate !== 'ALL') {
+      const targetDate = state.adminFilterDate === 'TODAY' ? new Date().toISOString().slice(0, 10) : state.adminFilterDate;
+      donations = donations.filter(d => d.timestamp && d.timestamp.slice(0, 10) === targetDate);
+    }
+
+    if (countPill) {
+      countPill.textContent = `${donations.length} ${donations.length === 1 ? 'Donation' : 'Donations'}`;
+    }
+
+    tbody.innerHTML = '';
+    if (donations.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: var(--text-muted); padding: 18px;">No micro-donations recorded under active date filter.</td></tr>`;
+      return;
+    }
+
+    donations.forEach(d => {
+      const tr = document.createElement('tr');
+      const timeStr = d.timestamp ? new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--';
+      tr.innerHTML = `
+        <td><code style="font-size: 0.78rem;">${d.donation_id || d.id || '—'}</code></td>
+        <td>${timeStr}</td>
+        <td><strong>${d.counter_name || d.counter_id}</strong></td>
+        <td>${d.donor_name || 'Anonymous'}${d.donor_phone ? ' (' + d.donor_phone + ')' : ''}</td>
+        <td><strong style="color: #DB2777; font-size: 0.95rem;">₹${(d.amount || 0).toLocaleString('en-IN')}</strong></td>
+        <td><span class="stock-pill" style="font-size: 0.72rem;">${d.payment_mode || 'CASH'}</span></td>
+        <td style="font-size: 0.8rem; color: var(--text-secondary);">${d.notes || (d.linked_sale_id ? 'Linked: ' + d.linked_sale_id : 'Discretionary contribution')}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderAdminTransfersAudit() {
+    const event = CS_Store.getEvent(state.eventKey);
+    const tbody = document.getElementById('admin-transfers-tbody');
+    const countPill = document.getElementById('admin-transfers-count-pill');
+    if (!tbody || !event) return;
+
+    let transfers = event.transfers || [];
+    if (state.adminFilterDate !== 'ALL') {
+      const targetDate = state.adminFilterDate === 'TODAY' ? new Date().toISOString().slice(0, 10) : state.adminFilterDate;
+      transfers = transfers.filter(t => t.timestamp && t.timestamp.slice(0, 10) === targetDate);
+    }
+
+    if (countPill) {
+      countPill.textContent = `${transfers.length} ${transfers.length === 1 ? 'Transfer' : 'Transfers'}`;
+    }
+
+    tbody.innerHTML = '';
+    if (transfers.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: var(--text-muted); padding: 18px;">No inter-counter transfers recorded under active date filter.</td></tr>`;
+      return;
+    }
+
+    transfers.forEach(t => {
+      const tr = document.createElement('tr');
+      const timeStr = t.timestamp ? new Date(t.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--';
+      const isBooks = (t.type || 'BOOKS') === 'BOOKS';
+      const status = t.status || 'ACCEPTED';
+
+      let statusStyle = 'background: #EFF6FF; color: #1D4ED8;';
+      if (status === 'ACCEPTED') statusStyle = 'background: #ECFDF5; color: #059669;';
+      else if (status === 'REJECTED') statusStyle = 'background: #FEF2F2; color: #DC2626;';
+      else if (status === 'PENDING') statusStyle = 'background: #FFFBEB; color: #D97706; font-weight: 800;';
+
+      tr.innerHTML = `
+        <td><code style="font-size: 0.78rem;">${t.transfer_id || t.id || 'TRF'}</code></td>
+        <td>${timeStr}</td>
+        <td><strong>${t.fromCounterName || t.fromCounterId}</strong></td>
+        <td><strong>${t.toCounterName || t.toCounterId}</strong></td>
+        <td><span class="stock-pill" style="font-size: 0.72rem;">${isBooks ? '📚 BOOKS' : '💵 CASH'}</span></td>
+        <td><strong>${isBooks ? t.amountOrQuantity + ' copies' : '₹' + Number(t.amountOrQuantity).toLocaleString('en-IN')}</strong></td>
+        <td style="font-size: 0.8rem; color: var(--text-secondary);">${t.notes || '—'}</td>
+        <td><span class="stock-pill" style="${statusStyle}">${status}</span></td>
+      `;
       tbody.appendChild(tr);
     });
   }

@@ -120,18 +120,75 @@ const CS_DEFAULT_SEED = {
         }
       ],
 
-      // Inter-counter stock transfers
+      // Inter-counter transfers (Books & Cash) with Two-Way Handshake
       transfers: [
         {
           id: "TRF-401",
-          timestamp: "2026-11-01T16:20:00.000Z",
+          transfer_id: "trf_99201bc",
+          type: "BOOKS",
           fromCounterId: "counter-01b",
+          from_counter: "counter-01b",
           fromCounterName: "Counter 01B (Main Lawn South)",
           toCounterId: "counter-02a",
+          to_counter: "counter-02a",
           toCounterName: "Counter 02A (Auditorium Foyer)",
           copies: 15,
+          amount_or_quantity: 15,
+          cashAmount: 0,
+          notes: "Sudden rush at stage entrance after keynote session",
+          status: "ACCEPTED",
           authorizedBy: "Amit Patel (PIN: 1102)",
-          reason: "Sudden rush at stage entrance after keynote session"
+          initiated_at: "2026-11-01T16:20:00.000Z",
+          resolved_at: "2026-11-01T16:22:00.000Z",
+          resolved_by: "Rohan Varma"
+        },
+        {
+          id: "TRF-402",
+          transfer_id: "trf_88102cd",
+          type: "CASH",
+          fromCounterId: "counter-01b",
+          from_counter: "counter-01b",
+          fromCounterName: "Counter 01B (Main Lawn South)",
+          toCounterId: "counter-01a",
+          to_counter: "counter-01a",
+          toCounterName: "Counter 01A",
+          copies: 0,
+          amount_or_quantity: 500,
+          cashAmount: 500,
+          notes: "Float change for ₹500 bill",
+          status: "PENDING",
+          authorizedBy: "Amit Patel (PIN: 1102)",
+          initiated_at: "2026-11-02T11:45:00.000Z",
+          resolved_at: null,
+          resolved_by: null
+        }
+      ],
+
+      // Micro-donations & excess payment handling
+      donations: [
+        {
+          donation_id: "don_88291f0a",
+          counter_id: "counter-01a",
+          counter_name: "Counter 01A",
+          timestamp: "2026-11-01T14:23:10Z",
+          amount: 200,
+          donor_name: "Anonymous Patron",
+          donor_phone: "9847012345",
+          payment_mode: "CASH",
+          linked_sale_id: "TXN-2001",
+          notes: "Customer waived ₹200 balance change as festival library donation"
+        },
+        {
+          donation_id: "don_77192a0b",
+          counter_id: "counter-01b",
+          counter_name: "Counter 01B",
+          timestamp: "2026-11-02T10:15:00Z",
+          amount: 500,
+          donor_name: "K. M. Basheer",
+          donor_phone: "9447123987",
+          payment_mode: "UPI",
+          linked_sale_id: null,
+          notes: "Direct discretionary donation for student publication fund"
         }
       ],
 

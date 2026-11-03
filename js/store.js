@@ -35,7 +35,7 @@ class CounterSyncStore {
   }
 
   _ensureInitialized() {
-    const CURRENT_VERSION = 12;
+    const CURRENT_VERSION = 14;
     const raw = localStorage.getItem(this.STORAGE_KEY);
     const ver = parseInt(localStorage.getItem(this.STORAGE_KEY + '_ver') || '0', 10);
 
@@ -52,6 +52,8 @@ class CounterSyncStore {
         ev.name = "Almuneer 2026";
         ev.unitPrice = 100;
         ev.bookTitle = "Chronicles of Almuneer (Festival Commemorative Edition)";
+        if (!ev.donations) ev.donations = [];
+        if (!ev.transfers) ev.transfers = [];
 
         // Eliminate any stale 250 unitPrice across existing cached transactions
         if (ev.transactions) {
@@ -455,8 +457,8 @@ class CounterSyncStore {
     return giveaway;
   }
 
-  // --- POS Workspace Billing Operations ---
-  recordSale({ eventKey, counterId, copies, paymentMode, buyerName, buyerPhone, note }) {
+  // --- POS Workspace Billing & Micro-Donation Operations ---
+  recordSale({ eventKey, counterId, copies, paymentMode, buyerName, buyerPhone, note, cashReceived, changeGiven, donationAmount, isConfirmed }) {
     const data = this.getData();
     const event = data.events[eventKey];
     if (!event) throw new Error("Event not found");
@@ -464,37 +466,134 @@ class CounterSyncStore {
     const counter = event.counters.find(c => c.id === counterId);
     if (!counter) throw new Error("Counter not found");
 
-    const count = parseInt(copies, 10);
-    if (isNaN(count) || count <= 0) throw new Error("Invalid copy quantity");
-    if (counter.currentStock < count) {
+    const count = parseInt(copies, 10) || 0;
+    const donation = parseInt(donationAmount, 10) || 0;
+
+    if (count <= 0 && donation <= 0) {
+      throw new Error("Must specify book copies to sell or a donation amount");
+    }
+
+    if (count > 0 && counter.currentStock < count) {
       throw new Error(`Insufficient counter stock! Available: ${counter.currentStock}`);
     }
 
-    const unitPrice = event.unitPrice;
-    const totalAmount = count * unitPrice;
+    const unitPrice = event.unitPrice || 100;
+    const totalSalePrice = count * unitPrice;
+    const tender = parseInt(cashReceived, 10) || (totalSalePrice + donation);
+    const change = parseInt(changeGiven, 10) || 0;
 
-    // Deduct physical counter stock
-    counter.currentStock -= count;
+    // Deduct physical counter stock only for book copies
+    if (count > 0) {
+      counter.currentStock -= count;
+    }
+
+    const saleId = `TXN-${Date.now().toString().slice(-6)}`;
+    const nowIso = new Date().toISOString();
 
     const txn = {
-      id: `TXN-${Date.now().toString().slice(-6)}`,
-      timestamp: new Date().toISOString(),
+      id: saleId,
+      sale_id: saleId,
+      timestamp: nowIso,
       counterId: counter.id,
       counterName: counter.name,
       copies: count,
       unitPrice: unitPrice,
-      totalAmount: totalAmount,
-      paymentMode: paymentMode, // CASH or UPI
-      buyerName: buyerName ? buyerName.trim() : "",
+      total_sale_price: totalSalePrice,
+      totalAmount: totalSalePrice + donation,
+      cashReceived: tender,
+      changeGiven: change,
+      donationAmount: donation,
+      paymentMode: paymentMode || "CASH",
+      buyerName: buyerName ? buyerName.trim() : (count === 0 ? "Patron Donor" : "Direct Buyer"),
       buyerPhone: buyerPhone ? buyerPhone.trim() : "",
-      note: note || "",
-      type: "SALE",
+      note: note || (donation > 0 ? `Includes ₹${donation} micro-donation` : ""),
+      type: count === 0 ? "DONATION" : "SALE",
+      isConfirmed: isConfirmed !== undefined ? isConfirmed : true,
       voided: false
     };
 
+    if (!event.transactions) event.transactions = [];
     event.transactions.unshift(txn);
+
+    // If micro-donation / excess change waived is present, record in donations ledger
+    if (donation > 0) {
+      if (!event.donations) event.donations = [];
+      const donationEntry = {
+        donation_id: `don_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 4)}`,
+        counter_id: counter.id,
+        counter_name: counter.name,
+        timestamp: nowIso,
+        amount: donation,
+        donor_name: buyerName ? buyerName.trim() : "Anonymous Patron",
+        donor_phone: buyerPhone ? buyerPhone.trim() : "",
+        payment_mode: paymentMode || "CASH",
+        linked_sale_id: count > 0 ? saleId : null,
+        notes: count > 0 ? `Change waived / excess payment on sale (${count} copies)` : (note || "Direct donation")
+      };
+      event.donations.unshift(donationEntry);
+    }
+
     this.saveData(data);
     return txn;
+  }
+
+  // Record Standalone Micro-Donation
+  recordDonation({ eventKey, counterId, amount, donorName, donorPhone, paymentMode, linkedSaleId, notes }) {
+    const data = this.getData();
+    const event = data.events[eventKey];
+    if (!event) throw new Error("Event not found");
+
+    const counter = event.counters.find(c => c.id === counterId);
+    if (!counter) throw new Error("Counter not found");
+
+    const amt = parseInt(amount, 10);
+    if (isNaN(amt) || amt <= 0) throw new Error("Please enter a valid donation amount (> 0)");
+
+    const nowIso = new Date().toISOString();
+    const donationId = `don_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 4)}`;
+
+    const donationEntry = {
+      donation_id: donationId,
+      counter_id: counter.id,
+      counter_name: counter.name,
+      timestamp: nowIso,
+      amount: amt,
+      donor_name: donorName ? donorName.trim() : "Anonymous Patron",
+      donor_phone: donorPhone ? donorPhone.trim() : "",
+      payment_mode: paymentMode || "CASH",
+      linked_sale_id: linkedSaleId || null,
+      notes: notes || "Discretionary campaign donation"
+    };
+
+    if (!event.donations) event.donations = [];
+    event.donations.unshift(donationEntry);
+
+    // Also record in transactions ledger to reflect in cash balance
+    if (!event.transactions) event.transactions = [];
+    event.transactions.unshift({
+      id: `TXN-DON-${Date.now().toString().slice(-5)}`,
+      sale_id: donationId,
+      timestamp: nowIso,
+      counterId: counter.id,
+      counterName: counter.name,
+      copies: 0,
+      unitPrice: 0,
+      total_sale_price: 0,
+      totalAmount: amt,
+      cashReceived: amt,
+      changeGiven: 0,
+      donationAmount: amt,
+      paymentMode: paymentMode || "CASH",
+      buyerName: donorName ? `${donorName.trim()} (Donor)` : "Anonymous Donor",
+      buyerPhone: donorPhone ? donorPhone.trim() : "",
+      note: notes || "Direct Micro-Donation",
+      type: "DONATION",
+      isConfirmed: true,
+      voided: false
+    });
+
+    this.saveData(data);
+    return donationEntry;
   }
 
   recordVIPHandover({ eventKey, counterId, recipientName, designation, copies, issuedBy }) {
@@ -541,8 +640,8 @@ class CounterSyncStore {
     return txn;
   }
 
-  // --- Inter-Counter Stock Transfers ---
-  transferStock({ eventKey, fromCounterId, toCounterId, copies, authorizedBy, reason }) {
+  // --- Inter-Counter Transfers (Books & Cash) with Two-Way Handshake ---
+  initiateInterCounterTransfer({ eventKey, fromCounterId, toCounterId, type = "BOOKS", amountOrQuantity, notes, authorizedBy }) {
     const data = this.getData();
     const event = data.events[eventKey];
     if (!event) throw new Error("Event not found");
@@ -551,31 +650,58 @@ class CounterSyncStore {
       throw new Error("Source and destination counters must be different");
     }
 
-    const count = parseInt(copies, 10);
-    if (isNaN(count) || count <= 0) throw new Error("Invalid transfer quantity");
+    const count = parseInt(amountOrQuantity, 10);
+    if (isNaN(count) || count <= 0) throw new Error("Please enter a valid positive quantity or amount");
 
     const source = event.counters.find(c => c.id === fromCounterId);
     const dest = event.counters.find(c => c.id === toCounterId);
 
     if (!source || !dest) throw new Error("Counter not found");
-    if (source.currentStock < count) {
-      throw new Error(`Source counter has only ${source.currentStock} copies available`);
+
+    const transferType = (type || "BOOKS").toUpperCase();
+
+    if (transferType === "BOOKS") {
+      if (source.currentStock < count) {
+        throw new Error(`Insufficient copies! Counter ${source.name} has only ${source.currentStock} copies available.`);
+      }
+      // Hold/reserve copies immediately on sender so they cannot be double-sold while in-flight
+      source.currentStock -= count;
+    } else if (transferType === "CASH") {
+      // Calculate sender's current cash in drawer
+      const metrics = this.getBalancedLedgerMetrics(eventKey, "ALL");
+      const senderBreakdown = metrics ? metrics.counterBreakdown.find(b => b.id === source.id) : null;
+      const availableCash = senderBreakdown ? senderBreakdown.cashCollection : 0;
+      if (availableCash < count) {
+        throw new Error(`Insufficient cash float! Counter ${source.name} has only ₹${availableCash} cash recorded.`);
+      }
+    } else {
+      throw new Error("Transfer type must be BOOKS or CASH");
     }
 
-    // Direct peer-to-peer balance
-    source.currentStock -= count;
-    dest.currentStock += count;
+    const transferId = `trf_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 4)}`;
+    const nowIso = new Date().toISOString();
 
     const transfer = {
       id: `TRF-${Date.now().toString().slice(-5)}`,
-      timestamp: new Date().toISOString(),
+      transfer_id: transferId,
+      type: transferType,
       fromCounterId: source.id,
+      from_counter: source.id,
       fromCounterName: source.name,
       toCounterId: dest.id,
+      to_counter: dest.id,
       toCounterName: dest.name,
-      copies: count,
-      authorizedBy: authorizedBy || "Counter Staff",
-      reason: reason || "Peer redistribution"
+      amountOrQuantity: count,
+      amount_or_quantity: count,
+      copies: transferType === "BOOKS" ? count : 0,
+      cashAmount: transferType === "CASH" ? count : 0,
+      notes: notes || (transferType === "CASH" ? "Float change transfer" : "Inter-counter books transfer"),
+      status: "PENDING",
+      initiated_at: nowIso,
+      timestamp: nowIso,
+      resolved_at: null,
+      resolved_by: null,
+      authorizedBy: authorizedBy || "Counter Staff"
     };
 
     if (!event.transfers) event.transfers = [];
@@ -583,6 +709,69 @@ class CounterSyncStore {
 
     this.saveData(data);
     return transfer;
+  }
+
+  // Receiver Peer Handshake: Accept or Reject Transfer
+  respondInterCounterTransfer({ eventKey, transferId, response, responderName }) {
+    const data = this.getData();
+    const event = data.events[eventKey];
+    if (!event) throw new Error("Event not found");
+
+    const transfer = (event.transfers || []).find(t => t.id === transferId || t.transfer_id === transferId);
+    if (!transfer) throw new Error("Transfer record not found");
+
+    if (transfer.status !== "PENDING") {
+      throw new Error(`Transfer has already been ${transfer.status}`);
+    }
+
+    const source = event.counters.find(c => c.id === transfer.fromCounterId);
+    const dest = event.counters.find(c => c.id === transfer.toCounterId);
+
+    const nowIso = new Date().toISOString();
+    const isAccept = response === "ACCEPT";
+
+    if (isAccept) {
+      transfer.status = "ACCEPTED";
+      transfer.resolved_at = nowIso;
+      transfer.resolved_by = responderName || "Receiving Counter Staff";
+
+      // If BOOKS, credit to receiver (sender was already held on initiate)
+      if (transfer.type === "BOOKS" && dest) {
+        dest.currentStock += transfer.copies;
+      }
+    } else {
+      transfer.status = "REJECTED";
+      transfer.resolved_at = nowIso;
+      transfer.resolved_by = responderName || "Receiving Counter Staff";
+
+      // If BOOKS, release held stock back to sender
+      if (transfer.type === "BOOKS" && source) {
+        source.currentStock += transfer.copies;
+      }
+    }
+
+    this.saveData(data);
+    return transfer;
+  }
+
+  // Backward compatible wrapper
+  transferStock({ eventKey, fromCounterId, toCounterId, copies, authorizedBy, reason }) {
+    return this.initiateInterCounterTransfer({
+      eventKey,
+      fromCounterId,
+      toCounterId,
+      type: "BOOKS",
+      amountOrQuantity: copies,
+      notes: reason,
+      authorizedBy
+    });
+  }
+
+  // Get Pending Transfers targeting a specific counter
+  getPendingTransfersForCounter(eventKey, counterId) {
+    const event = this.getEvent(eventKey);
+    if (!event || !event.transfers) return [];
+    return event.transfers.filter(t => (t.toCounterId === counterId || t.to_counter === counterId) && t.status === "PENDING");
   }
 
   // --- Pre-Order Fulfillment ---
@@ -825,6 +1014,10 @@ class CounterSyncStore {
 
     const grossRevenue = cashTotal + upiTotal;
 
+    // Micro-Donations calculation
+    const allDonations = event.donations || [];
+    const totalDonations = allDonations.reduce((sum, d) => sum + (d.amount || 0), 0);
+
     // Pre-orders summary
     const preOrders = event.preOrders || [];
     const fulfilledPreOrders = preOrders.filter(p => p.status === "FULFILLED").length;
@@ -834,21 +1027,22 @@ class CounterSyncStore {
     const counterBreakdown = (event.counters || []).map(counter => {
       // 1. All-time non-voided transactions for this counter
       const allCounterTxns = (event.transactions || []).filter(t => t.counterId === counter.id && !t.voided);
-      const allTimeSold = allCounterTxns.filter(t => t.paymentMode === "CASH" || t.paymentMode === "UPI").reduce((s, t) => s + (t.copies || 0), 0);
+      const allTimeSold = allCounterTxns.filter(t => (t.paymentMode === "CASH" || t.paymentMode === "UPI") && (t.type === "SALE" || t.type === "PREORDER_FULFILLMENT")).reduce((s, t) => s + (t.copies || 0), 0);
       const allTimeVip = allCounterTxns.filter(t => t.paymentMode === "FREE_VIP" || t.type === "VIP").reduce((s, t) => s + (t.copies || 0), 0);
 
-      // 2. Total physical stock supplied = initial allocation + accepted dispatches + net transfers
+      // 2. Total physical stock supplied = initial allocation + accepted dispatches + net accepted book transfers
       const acceptedDispatches = (event.dispatches || [])
         .filter(d => d.counterId === counter.id && d.status === "ACCEPTED")
         .reduce((s, d) => s + d.copies, 0);
 
       const transfersReceived = (event.transfers || [])
-        .filter(t => t.toCounterId === counter.id)
-        .reduce((s, t) => s + t.copies, 0);
+        .filter(t => (t.toCounterId === counter.id || t.to_counter === counter.id) && (t.type === "BOOKS" || !t.type) && t.status === "ACCEPTED")
+        .reduce((s, t) => s + (t.copies || t.amountOrQuantity || t.amount_or_quantity || 0), 0);
 
+      // Sender holds both ACCEPTED and PENDING outgoing book transfers
       const transfersSent = (event.transfers || [])
-        .filter(t => t.fromCounterId === counter.id)
-        .reduce((s, t) => s + t.copies, 0);
+        .filter(t => (t.fromCounterId === counter.id || t.from_counter === counter.id) && (t.type === "BOOKS" || !t.type) && (t.status === "ACCEPTED" || t.status === "PENDING"))
+        .reduce((s, t) => s + (t.copies || t.amountOrQuantity || t.amount_or_quantity || 0), 0);
 
       const stockSupplied = (counter.initialStock || 0) + acceptedDispatches + transfersReceived - transfersSent;
 
@@ -856,12 +1050,27 @@ class CounterSyncStore {
       const physicalStock = Math.max(0, stockSupplied - allTimeSold - allTimeVip);
       counter.currentStock = physicalStock;
 
-      // 4. Financial & sales metrics (all-time or date-filtered)
+      // 4. Financial & cash drawer calculations (including micro-donations & cash float transfers)
       const cTxns = nonVoidedTxns.filter(t => t.counterId === counter.id);
-      const cCash = cTxns.filter(t => t.paymentMode === "CASH").reduce((s, t) => s + (t.totalAmount || 0), 0);
+      const rawCash = cTxns.filter(t => t.paymentMode === "CASH").reduce((s, t) => s + (t.totalAmount || 0), 0);
       const cUpi = cTxns.filter(t => t.paymentMode === "UPI").reduce((s, t) => s + (t.totalAmount || 0), 0);
-      const cSold = (filterDate === "ALL") ? allTimeSold : cTxns.filter(t => t.paymentMode === "CASH" || t.paymentMode === "UPI").reduce((s, t) => s + (t.copies || 0), 0);
+      const cSold = (filterDate === "ALL") ? allTimeSold : cTxns.filter(t => (t.paymentMode === "CASH" || t.paymentMode === "UPI") && (t.type === "SALE" || t.type === "PREORDER_FULFILLMENT")).reduce((s, t) => s + (t.copies || 0), 0);
       const cVip = (filterDate === "ALL") ? allTimeVip : cTxns.filter(t => t.paymentMode === "FREE_VIP" || t.type === "VIP").reduce((s, t) => s + (t.copies || 0), 0);
+
+      // Cash float transfers between counters
+      const cashTransfersReceived = (event.transfers || [])
+        .filter(t => (t.toCounterId === counter.id || t.to_counter === counter.id) && t.type === "CASH" && t.status === "ACCEPTED")
+        .reduce((s, t) => s + (t.cashAmount || t.amountOrQuantity || t.amount_or_quantity || 0), 0);
+
+      const cashTransfersSent = (event.transfers || [])
+        .filter(t => (t.fromCounterId === counter.id || t.from_counter === counter.id) && t.type === "CASH" && (t.status === "ACCEPTED" || t.status === "PENDING"))
+        .reduce((s, t) => s + (t.cashAmount || t.amountOrQuantity || t.amount_or_quantity || 0), 0);
+
+      const netCash = Math.max(0, rawCash + cashTransfersReceived - cashTransfersSent);
+
+      // Micro-donations for this counter
+      const counterDonations = allDonations.filter(d => d.counter_id === counter.id);
+      const cDonationAmt = counterDonations.reduce((s, d) => s + (d.amount || 0), 0);
 
       return {
         ...counter,
@@ -869,9 +1078,13 @@ class CounterSyncStore {
         copiesSold: cSold,
         copiesVip: cVip,
         currentStock: physicalStock,
-        cashCollection: cCash,
+        cashCollection: netCash,
         upiCollection: cUpi,
-        totalNetCollection: cCash + cUpi
+        totalNetCollection: netCash + cUpi,
+        donationAmount: cDonationAmt,
+        donationCount: counterDonations.length,
+        cashTransfersReceived,
+        cashTransfersSent
       };
     });
 
@@ -886,6 +1099,8 @@ class CounterSyncStore {
       grossRevenue,
       cashTotal,
       upiTotal,
+      totalDonations,
+      grandRevenueWithDonations: grossRevenue + totalDonations,
       fulfilledPreOrders,
       pendingPreOrders,
       counterBreakdown
@@ -962,19 +1177,183 @@ class CounterSyncStore {
     return [headers.join(","), ...rows.map(r => r.join(","))].join("\r\n");
   }
 
-  // --- Encrypted JSON Backup / Export ---
-  exportBackupJSON(eventKey) {
+  // --- POS Backup & Disaster Recovery Architecture (Section 2 & 3 Schema) ---
+  exportBackupJSON(eventKey, counterId = null) {
     const event = this.getEvent(eventKey);
     if (!event) return null;
 
+    const sourceCounter = counterId || "super_admin_master";
+    const nowIso = new Date().toISOString();
+
+    const salesList = (event.transactions || [])
+      .filter(t => !counterId || t.counterId === counterId)
+      .map(t => ({
+        sale_id: t.sale_id || t.id,
+        counter_id: t.counterId,
+        timestamp: t.timestamp,
+        copies: t.copies || 0,
+        unit_price: t.unitPrice || 100,
+        total_sale_price: (t.copies || 0) * (t.unitPrice || 100),
+        cash_received: t.cashReceived !== undefined ? t.cashReceived : (t.totalAmount || 0),
+        change_given: t.changeGiven || 0,
+        donation_amount: t.donationAmount || 0,
+        payment_mode: t.paymentMode || "CASH",
+        buyer_name: t.buyerName || "Direct Buyer",
+        is_confirmed: t.isConfirmed !== undefined ? t.isConfirmed : true,
+        type: t.type || "SALE",
+        voided: t.voided || false
+      }));
+
+    const donationsList = (event.donations || [])
+      .filter(d => !counterId || d.counter_id === counterId)
+      .map(d => ({
+        donation_id: d.donation_id || d.id,
+        counter_id: d.counter_id,
+        timestamp: d.timestamp,
+        amount: d.amount,
+        donor_name: d.donor_name || "Anonymous",
+        payment_mode: d.payment_mode || "CASH",
+        linked_sale_id: d.linked_sale_id || null,
+        notes: d.notes || ""
+      }));
+
+    const transfersList = (event.transfers || [])
+      .filter(t => !counterId || t.fromCounterId === counterId || t.toCounterId === counterId || t.from_counter === counterId || t.to_counter === counterId)
+      .map(t => ({
+        transfer_id: t.transfer_id || t.id,
+        type: t.type || "BOOKS",
+        from_counter: t.from_counter || t.fromCounterId,
+        to_counter: t.to_counter || t.toCounterId,
+        from_counter_name: t.fromCounterName,
+        to_counter_name: t.toCounterName,
+        amount_or_quantity: t.amount_or_quantity || t.amountOrQuantity || t.copies || t.cashAmount || 0,
+        notes: t.notes || "",
+        status: t.status || "ACCEPTED",
+        initiated_at: t.initiated_at || t.timestamp,
+        resolved_at: t.resolved_at || null,
+        resolved_by: t.resolved_by || null
+      }));
+
     const payload = {
-      app: "CounterSync",
-      version: "2.0.0",
-      exportTimestamp: new Date().toISOString(),
-      event
+      system_meta: {
+        version: "2.4.0",
+        app: "CounterSync POS",
+        export_timestamp: nowIso,
+        source_counter: sourceCounter,
+        event_key: eventKey,
+        event_name: event.name
+      },
+      donations: donationsList,
+      inter_counter_transfers: transfersList,
+      sales: salesList,
+      // Full system snapshot for clean slate disaster recovery
+      event_snapshot: event
     };
 
     return JSON.stringify(payload, null, 2);
+  }
+
+  // Restore & Hydration Workflow with Safe Merge vs Total Overwrite (Section 2.3)
+  restoreBackupJSON({ eventKey, jsonString, policy = "MERGE" }) {
+    let payload;
+    try {
+      payload = JSON.parse(jsonString);
+    } catch (e) {
+      throw new Error("Invalid or corrupt JSON file. Could not parse data.");
+    }
+
+    if (!payload || typeof payload !== "object") {
+      throw new Error("Invalid backup payload format.");
+    }
+
+    const data = this.getData();
+    let event = data.events[eventKey];
+    if (!event) {
+      event = payload.event_snapshot || payload.event;
+      if (!event) throw new Error(`Event "${eventKey}" not found in current store or backup.`);
+      data.events[eventKey] = event;
+    }
+
+    if (policy === "OVERWRITE") {
+      // Total Overwrite (Clean Slate) - wipes local state and populates exactly what is inside the backup
+      if (payload.event_snapshot) {
+        data.events[eventKey] = JSON.parse(JSON.stringify(payload.event_snapshot));
+      } else {
+        if (payload.donations) event.donations = payload.donations;
+        if (payload.inter_counter_transfers) event.transfers = payload.inter_counter_transfers;
+        if (payload.sales) {
+          event.transactions = payload.sales.map(s => ({
+            id: s.sale_id || `TXN-${Date.now()}`,
+            sale_id: s.sale_id,
+            counterId: s.counter_id,
+            timestamp: s.timestamp,
+            copies: s.copies,
+            unitPrice: s.unit_price,
+            total_sale_price: s.total_sale_price,
+            totalAmount: (s.total_sale_price || 0) + (s.donation_amount || 0),
+            paymentMode: s.payment_mode,
+            buyerName: s.buyer_name,
+            cashReceived: s.cash_received,
+            changeGiven: s.change_given,
+            donationAmount: s.donation_amount,
+            isConfirmed: s.is_confirmed,
+            type: s.type || "SALE",
+            voided: s.voided || false
+          }));
+        }
+      }
+    } else {
+      // Safe Merge (Upsert) - updates existing items by primary key, adds missing records, preserves current terminal unsynced records
+      if (!event.donations) event.donations = [];
+      (payload.donations || []).forEach(d => {
+        const id = d.donation_id || d.id;
+        const idx = event.donations.findIndex(x => (x.donation_id || x.id) === id);
+        if (idx >= 0) event.donations[idx] = { ...event.donations[idx], ...d };
+        else event.donations.unshift(d);
+      });
+
+      if (!event.transfers) event.transfers = [];
+      (payload.inter_counter_transfers || []).forEach(t => {
+        const id = t.transfer_id || t.id;
+        const idx = event.transfers.findIndex(x => (x.transfer_id || x.id) === id);
+        if (idx >= 0) event.transfers[idx] = { ...event.transfers[idx], ...t };
+        else event.transfers.unshift(t);
+      });
+
+      if (!event.transactions) event.transactions = [];
+      (payload.sales || []).forEach(s => {
+        const id = s.sale_id || s.id;
+        const idx = event.transactions.findIndex(x => (x.sale_id || x.id) === id);
+        const mapped = {
+          id: id,
+          sale_id: id,
+          counterId: s.counter_id || s.counterId,
+          timestamp: s.timestamp,
+          copies: s.copies,
+          unitPrice: s.unit_price || s.unitPrice || 100,
+          total_sale_price: s.total_sale_price || ((s.copies || 0) * (s.unit_price || 100)),
+          totalAmount: (s.total_sale_price || s.totalAmount || 0) + (s.donation_amount || 0),
+          paymentMode: s.payment_mode || s.paymentMode || "CASH",
+          buyerName: s.buyer_name || s.buyerName || "Direct Buyer",
+          cashReceived: s.cash_received,
+          changeGiven: s.change_given,
+          donationAmount: s.donation_amount,
+          isConfirmed: s.is_confirmed !== undefined ? s.is_confirmed : true,
+          type: s.type || "SALE",
+          voided: s.voided || false
+        };
+        if (idx >= 0) event.transactions[idx] = { ...event.transactions[idx], ...mapped };
+        else event.transactions.unshift(mapped);
+      });
+    }
+
+    this.saveData(data);
+    return {
+      policy,
+      donationsCount: (payload.donations || []).length,
+      transfersCount: (payload.inter_counter_transfers || []).length,
+      salesCount: (payload.sales || []).length
+    };
   }
 }
 

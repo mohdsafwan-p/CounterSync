@@ -22,7 +22,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800;900&family=Manjari:wght@400;700&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- Bulletproof Standalone CSS -->
-  <link rel="stylesheet" href="./css/style.css?v=12">
+  <link rel="stylesheet" href="./css/style.css?v=14">
 </head>
 <body>
   <div id="app">
@@ -296,15 +296,37 @@
           </button>
         </div>
 
+        <!-- Incoming Inter-Counter Transfer Banner (Two-Way Handshake) -->
+        <div id="pos-transfer-banner" class="transfer-handshake-banner hidden">
+          <div class="transfer-banner-info">
+            <h4 id="pos-transfer-heading">⇄ Incoming Inter-Counter Transfer!</h4>
+            <p id="pos-transfer-details">Counter 02B sent ₹500 Cash. Accept transfer?</p>
+          </div>
+          <div class="transfer-banner-actions">
+            <button type="button" id="btn-accept-transfer" class="btn-transfer-accept">
+              ✓ Accept
+            </button>
+            <button type="button" id="btn-reject-transfer" class="btn-transfer-reject">
+              ✕ Reject
+            </button>
+          </div>
+        </div>
+
         <!-- TAB 1: SALE (Image 1) -->
         <div id="tab-pane-sale" class="dock-content-pane active">
           <!-- Quantity Row Header -->
           <div class="dock-section-head">
             <span class="dock-section-title">SELECT QUANTITY</span>
-            <button type="button" class="btn-vip-free-link" id="btn-open-vip-drawer">
-              <span class="vip-gift-icon">🎁</span>
-              <span>+ VIP / Free Copy</span>
-            </button>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button type="button" class="btn-donation-link" id="btn-toggle-donation-pane">
+                <span class="vip-gift-icon">💝</span>
+                <span>+ Tip / Donation</span>
+              </button>
+              <button type="button" class="btn-vip-free-link" id="btn-open-vip-drawer">
+                <span class="vip-gift-icon">🎁</span>
+                <span>+ VIP / Free Copy</span>
+              </button>
+            </div>
           </div>
 
           <!-- 4 Quantity Selectors -->
@@ -370,6 +392,48 @@
             <input type="hidden" id="input-buyer-phone" value="">
           </div>
 
+          <!-- Micro-Donation & Excess Tender Drawer (Collapsible) -->
+          <div id="panel-donation-excess" class="donation-excess-box hidden">
+            <div class="donation-box-header">
+              <span class="donation-box-title">💝 Micro-Donation & Excess Payment</span>
+              <button type="button" id="btn-close-donation-pane" class="donation-box-close" title="Close">✕</button>
+            </div>
+
+            <!-- Fast Tender Row (When Cash Selected) -->
+            <div id="row-cash-tender" class="donation-row">
+              <label class="input-label" style="font-size: 0.8rem; margin-bottom: 4px;">Cash Tendered by Customer</label>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="number" id="input-cash-tendered" placeholder="e.g. 500" class="tender-input font-mono" min="0" step="10">
+                <div class="quick-tender-pills">
+                  <button type="button" class="btn-tender-chip" data-preset="exact">Exact</button>
+                  <button type="button" class="btn-tender-chip" data-preset="200">₹200</button>
+                  <button type="button" class="btn-tender-chip" data-preset="500">₹500</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Change Due & Keep Change Checkbox -->
+            <div id="row-change-calc" class="donation-change-card">
+              <div>
+                <div style="font-size: 0.72rem; color: #9F1239; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Change Due</div>
+                <div id="display-change-due" style="font-size: 1.25rem; font-weight: 800; color: #BE185D;" class="font-mono">₹0</div>
+              </div>
+              <label class="donation-checkbox-label" id="label-keep-change-donation">
+                <input type="checkbox" id="chk-keep-change-donation" style="width: 18px; height: 18px; accent-color: #E11D48; cursor: pointer;">
+                <span>Keep Change as Donation</span>
+              </label>
+            </div>
+
+            <!-- Direct Discretionary Donation -->
+            <div class="donation-row" style="margin-top: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <label class="input-label" style="font-size: 0.8rem; margin: 0;">Direct / Discretionary Donation (₹)</label>
+                <span style="font-size: 0.72rem; color: var(--text-muted);">Copies can be 0</span>
+              </div>
+              <input type="number" id="input-extra-donation" placeholder="Enter amount (e.g. 50, 100, 500)" class="tender-input font-mono" min="0" step="10">
+            </div>
+          </div>
+
           <!-- Confirm Sale Hero Button -->
           <button type="button" id="btn-proceed-sale" class="btn-confirm-sale-hero">
             <span class="check-circle-icon">✓</span>
@@ -429,12 +493,17 @@
                   <div class="calc-head-sub">Count physical currency against logged sales</div>
                 </div>
               </div>
-              <div class="calc-expected-pill" id="recon-expected-cash-pill">
-                Expected: <span id="recon-expected-cash">₹0</span>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <button type="button" id="btn-reset-denominations" class="btn-denom-reset" title="Reset all counts to 0">
+                  ↺ Reset
+                </button>
+                <div class="calc-expected-pill" id="recon-expected-cash-pill">
+                  Expected: <span id="recon-expected-cash">₹0</span>
+                </div>
               </div>
             </div>
 
-            <!-- 2-Column Denomination Grid (6 boxes) -->
+            <!-- 2-Column Denomination Grid (7 boxes with Coins) -->
             <div class="eod-notes-grid">
               <!-- ₹500 -->
               <div class="eod-note-box">
@@ -489,6 +558,15 @@
                 </div>
                 <input type="number" class="denom-input note-box-input" data-val="10" value="0" min="0" inputmode="numeric">
               </div>
+
+              <!-- Coins -->
+              <div class="eod-note-box">
+                <div class="note-box-label">
+                  <span class="note-amount">Coins</span>
+                  <span class="note-times">×</span>
+                </div>
+                <input type="number" class="denom-input note-box-input" data-val="1" value="0" min="0" inputmode="numeric">
+              </div>
             </div>
 
             <!-- Reconciliation Summary Bar -->
@@ -504,7 +582,7 @@
             </div>
           </div>
 
-          <!-- 3. Bottom Two Action Cards -->
+          <!-- 3. Bottom Action Cards -->
           <div class="eod-actions-duo">
             <div class="eod-action-card" id="btn-export-counter-json" role="button" tabindex="0">
               <div class="action-card-icon-box bg-tint-blue">
@@ -517,6 +595,20 @@
               <div>
                 <div class="action-card-text-title">Save Backup</div>
                 <div class="action-card-text-sub">Download .JSON</div>
+              </div>
+            </div>
+
+            <div class="eod-action-card" id="btn-trigger-restore-json" role="button" tabindex="0">
+              <div class="action-card-icon-box" style="background: #ECFDF5; border: 1px solid #A7F3D0;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </div>
+              <div>
+                <div class="action-card-text-title">Restore Backup</div>
+                <div class="action-card-text-sub">Upload .JSON</div>
               </div>
             </div>
 
@@ -533,6 +625,8 @@
               </div>
             </div>
           </div>
+          <!-- Hidden JSON Restore File Input -->
+          <input type="file" id="input-restore-backup" accept=".json,application/json" class="hidden">
         </div>
 
         <!-- 2.7 Fixed Bottom Navigation Dock (4 Tabs) -->
@@ -792,12 +886,15 @@
             </select>
           </div>
 
-          <div style="display: flex; gap: 10px; align-items: center;">
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <button id="btn-export-csv" class="btn-pill btn-pill-primary" style="background: linear-gradient(135deg, #10B981, #059669);">
               📊 Context-Aware CSV Export
             </button>
             <button id="btn-download-json-master" class="btn-pill btn-pill-subtle">
               📥 Master JSON Backup
+            </button>
+            <button id="btn-trigger-restore-admin" class="btn-pill btn-pill-subtle">
+              📤 Restore Master Backup
             </button>
           </div>
         </div>
@@ -864,6 +961,12 @@
             <div id="kpi-preorder-ratio" class="kpi-tile-value text-amber">1 / 4</div>
             <div id="kpi-preorder-sub" class="kpi-tile-sub">1 Delivered • 3 Pending</div>
           </div>
+
+          <div class="kpi-tile" style="border-left: 4px solid #EC4899;">
+            <div class="kpi-tile-title">Micro-Donations Collected</div>
+            <div id="kpi-donations-total" class="kpi-tile-value" style="color: #DB2777;">₹0</div>
+            <div id="kpi-donations-sub" class="kpi-tile-sub">0 patrons • Discretionary & change</div>
+          </div>
         </div>
 
         <!-- 4.5 Live Counter Performance Table -->
@@ -920,6 +1023,55 @@
             </tbody>
           </table>
         </div>
+
+        <!-- Micro-Donations Ledger Table (Section 1.1) -->
+        <div class="data-table-wrapper" id="admin-donations-wrapper">
+          <div class="data-table-header">
+            <h3>💝 Campaign Micro-Donations Ledger</h3>
+            <span class="stock-pill" id="admin-donations-count-pill" style="background: #FDF2F8; color: #DB2777; border-color: #FBCFE8;">0 Donations</span>
+          </div>
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th>Donation ID</th>
+                <th>Time</th>
+                <th>Counter</th>
+                <th>Donor Name / Phone</th>
+                <th>Amount</th>
+                <th>Payment Mode</th>
+                <th>Notes / Linked Sale</th>
+              </tr>
+            </thead>
+            <tbody id="admin-donations-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Inter-Counter Transfers Audit Table (Section 1.2) -->
+        <div class="data-table-wrapper" id="admin-transfers-wrapper">
+          <div class="data-table-header">
+            <h3>⇄ Inter-Counter Transfers Audit (Peer-to-Peer Handshake)</h3>
+            <span class="stock-pill" id="admin-transfers-count-pill" style="background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE;">0 Transfers</span>
+          </div>
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th>Transfer ID</th>
+                <th>Timestamp</th>
+                <th>From Counter</th>
+                <th>To Counter</th>
+                <th>Type</th>
+                <th>Quantity / Amount</th>
+                <th>Memo / Notes</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="admin-transfers-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
       </section>
     </main>
 
@@ -956,36 +1108,191 @@
       </div>
     </div>
 
-    <!-- 2. Fast Sale Confirmation Dialog (Double-tap prevention during festival rush) -->
+    <!-- 2. Fast Cash Sale Confirmation Dialog (Section 1.3) -->
     <div id="modal-confirm-sale" class="modal-overlay hidden">
-      <div class="modal-content" style="max-width: 420px; text-align: center;">
-        <div style="font-size: 3rem; margin-bottom: 12px;">⚡</div>
-        <h3 style="font-size: 1.4rem; margin-bottom: 6px;">Confirm Rush Sale</h3>
-        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 20px;">
-          Please verify order details before debiting physical stock.
+      <div class="modal-content" style="max-width: 440px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.4rem;">💵</span>
+            <h3 style="font-size: 1.25rem; font-weight: 800; margin: 0; color: var(--text-primary);">Verify Cash Sale</h3>
+          </div>
+          <button class="modal-close-btn" data-close-modal="modal-confirm-sale">✕</button>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;">
+          Please verify order details before committing cash record and debiting physical inventory.
         </p>
 
-        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 18px; margin-bottom: 20px;">
-          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-            <span style="color: var(--text-secondary);">Quantity:</span>
-            <strong id="confirm-modal-qty" style="font-size: 1.1rem;">1 Copy</strong>
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.95rem;">
+            <span style="color: var(--text-secondary);">Quantity / Titles:</span>
+            <strong id="confirm-modal-qty" style="font-size: 1.05rem;">1 Copy</strong>
           </div>
-          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-            <span style="color: var(--text-secondary);">Payment Mode:</span>
-            <strong id="confirm-modal-mode" style="color: var(--color-emerald); font-size: 1.1rem;">CASH</strong>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.95rem;">
+            <span style="color: var(--text-secondary);">Book Price / Cost:</span>
+            <strong id="confirm-modal-book-price" style="font-size: 1.05rem;">₹100</strong>
           </div>
-          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-            <span style="color: var(--text-secondary);">Total Bill:</span>
-            <strong id="confirm-modal-total" style="font-size: 1.4rem; color: var(--text-primary);">₹100</strong>
+          <div id="confirm-modal-donation-row" style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.95rem;" class="hidden">
+            <span style="color: #DB2777; font-weight: 700;">💝 Micro-Donation:</span>
+            <strong id="confirm-modal-donation" style="color: #DB2777; font-size: 1.05rem;">₹0</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding-top: 8px; border-top: 1px dashed var(--border-subtle); font-size: 1.05rem;">
+            <span style="font-weight: 700; color: var(--text-primary);">Total Cash Collected:</span>
+            <strong id="confirm-modal-total" style="font-size: 1.35rem; color: var(--color-emerald);">₹100</strong>
+          </div>
+          <div id="confirm-modal-change-row" style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.95rem;" class="hidden">
+            <span style="color: var(--text-secondary);">Change Returned:</span>
+            <strong id="confirm-modal-change" style="font-size: 1.05rem; color: #E11D48;">₹0</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0; font-size: 0.9rem;">
+            <span style="color: var(--text-secondary);">Customer / Buyer:</span>
+            <strong id="confirm-modal-buyer" style="color: var(--text-primary);">Direct Buyer</strong>
+          </div>
+          <!-- Hidden mode kept for store compatibility -->
+          <span id="confirm-modal-mode" class="hidden">CASH</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 12px;">
+          <button type="button" class="btn-pill btn-pill-subtle" data-close-modal="modal-confirm-sale" style="justify-content: center; height: 48px; font-weight: 700;">
+            Cancel / Edit
+          </button>
+          <button type="button" id="btn-finalize-sale-confirmed" class="btn-complete-sale press-effect" style="height: 48px; font-size: 1rem; font-weight: 800;">
+            Confirm & Commit (↵)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Unified Inter-Counter Exchange Modal (Section 1.2) -->
+    <div id="modal-counter-exchange" class="modal-overlay hidden">
+      <div class="modal-content" style="max-width: 440px;">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.4rem;">⇄</span>
+            <h3 style="color: #0066FF; font-weight: 800; margin: 0;">Inter-Counter Exchange</h3>
+          </div>
+          <button class="modal-close-btn" data-close-modal="modal-counter-exchange">✕</button>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;">
+          Share books or cash float with neighbouring desks. Initiates a two-way handshake requiring peer acceptance.
+        </p>
+
+        <!-- Segmented Transfer Type Selector -->
+        <div class="exchange-segmented-tabs">
+          <button type="button" class="exchange-segment-btn active" id="btn-type-books" data-type="BOOKS">
+            📚 Book Copies
+          </button>
+          <button type="button" class="exchange-segment-btn" id="btn-type-cash" data-type="CASH">
+            💵 Cash Float
+          </button>
+        </div>
+
+        <!-- Destination Counter -->
+        <div style="margin-bottom: 14px;">
+          <label class="input-label" for="exchange-target-counter">Destination Counter *</label>
+          <select id="exchange-target-counter" class="date-select" style="width: 100%; height: 44px;">
+            <!-- Populated dynamically with other counters -->
+          </select>
+        </div>
+
+        <!-- Quantity or Amount -->
+        <div style="margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <label class="input-label" id="label-exchange-qty" style="margin: 0;">Number of Copies *</label>
+            <span id="exchange-avail-hint" style="font-size: 0.78rem; color: var(--color-emerald); font-weight: 700;">
+              Available: 100 copies
+            </span>
+          </div>
+          <input type="number" id="exchange-qty" class="tender-input font-mono" placeholder="e.g. 10" min="1" step="1">
+        </div>
+
+        <!-- Memo / Notes -->
+        <div style="margin-bottom: 20px;">
+          <label class="input-label" for="exchange-notes">Transfer Memo (Optional)</label>
+          <input type="text" id="exchange-notes" placeholder="e.g. Change for ₹500 note, or Busy rush copies">
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 10px;">
+          <button type="button" class="btn-pill btn-pill-subtle" data-close-modal="modal-counter-exchange" style="height: 48px; font-weight: 700;">
+            Cancel
+          </button>
+          <button type="button" id="btn-submit-counter-exchange" class="btn-complete-sale press-effect" style="height: 48px; font-weight: 800; font-size: 0.95rem;">
+            Send Transfer Request ➔
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- JSON Restore & Conflict Resolution Modal (Section 2 & 3) -->
+    <div id="modal-restore-conflict" class="modal-overlay hidden">
+      <div class="modal-content" style="max-width: 480px;">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.4rem;">📥</span>
+            <h3 style="color: #059669; font-weight: 800; margin: 0;">Restore Backup & Conflict Resolution</h3>
+          </div>
+          <button class="modal-close-btn" data-close-modal="modal-restore-conflict">✕</button>
+        </div>
+
+        <!-- Backup Metadata Card -->
+        <div id="restore-meta-summary" class="restore-summary-card">
+          <div class="restore-meta-row">
+            <span class="restore-meta-label">Event:</span>
+            <strong id="restore-summary-event">Almuneer 2026</strong>
+          </div>
+          <div class="restore-meta-row">
+            <span class="restore-meta-label">Origin:</span>
+            <span id="restore-summary-counter" class="stock-pill" style="font-size: 0.75rem;">Counter 01A</span>
+          </div>
+          <div class="restore-meta-row">
+            <span class="restore-meta-label">Timestamp:</span>
+            <span id="restore-summary-time" style="font-size: 0.8rem; color: var(--text-secondary);">--</span>
+          </div>
+          <div class="restore-counts-chips">
+            <span class="count-chip" id="chip-restore-sales">0 Sales</span>
+            <span class="count-chip" id="chip-restore-donations">0 Donations</span>
+            <span class="count-chip" id="chip-restore-transfers">0 Transfers</span>
           </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-          <button class="btn-pill btn-pill-subtle" data-close-modal="modal-confirm-sale" style="justify-content: center; height: 50px;">
+        <div style="margin-top: 16px; margin-bottom: 10px;">
+          <label class="input-label" style="font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">
+            Select Resolution Policy:
+          </label>
+
+          <!-- Safe Merge Card -->
+          <label class="policy-radio-card active" id="label-policy-merge">
+            <input type="radio" name="restore-policy" value="MERGE" checked style="accent-color: #0066FF;">
+            <div style="margin-left: 10px;">
+              <div style="font-weight: 800; font-size: 0.92rem; color: var(--text-primary);">
+                Safe Merge (Upsert) <span style="color: #059669; font-size: 0.75rem;">★ RECOMMENDED</span>
+              </div>
+              <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px;">
+                Updates existing records by Primary Key, appends missing entries, and preserves unsynced local offline data.
+              </div>
+            </div>
+          </label>
+
+          <!-- Clean Slate Overwrite Card -->
+          <label class="policy-radio-card" id="label-policy-overwrite" style="margin-top: 10px;">
+            <input type="radio" name="restore-policy" value="OVERWRITE" style="accent-color: #EF4444;">
+            <div style="margin-left: 10px;">
+              <div style="font-weight: 800; font-size: 0.92rem; color: #DC2626;">
+                Total Overwrite (Clean Slate)
+              </div>
+              <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px;">
+                Completely replaces current event records with backup contents. Useful for fresh device hydration.
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1.6fr; gap: 10px; margin-top: 20px;">
+          <button type="button" class="btn-pill btn-pill-subtle" data-close-modal="modal-restore-conflict" style="height: 48px; font-weight: 700;">
             Cancel
           </button>
-          <button id="btn-finalize-sale-confirmed" class="btn-complete-sale" style="height: 50px; font-size: 1.05rem;">
-            Confirm & Log ✓
+          <button type="button" id="btn-confirm-hydrate" class="btn-complete-sale press-effect" style="height: 48px; background: linear-gradient(135deg, #059669, #047857); font-weight: 800; font-size: 0.95rem;">
+            Proceed With Restore ✓
           </button>
         </div>
       </div>
@@ -1274,9 +1581,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="./js/qrcode.js?v=12"></script>
-  <script src="./js/seed.js?v=12"></script>
-  <script src="./js/store.js?v=12"></script>
-  <script src="./js/app.js?v=12"></script>
+  <script src="./js/qrcode.js?v=14"></script>
+  <script src="./js/seed.js?v=14"></script>
+  <script src="./js/store.js?v=14"></script>
+  <script src="./js/app.js?v=14"></script>
 </body>
 </html>

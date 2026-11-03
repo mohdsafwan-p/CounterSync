@@ -3827,3 +3827,324 @@ body:not(.light-theme) .dock-tab-btn.active {
 body:not(.light-theme) .dock-orange-dot {
   border-color: #070B16;
 }
+
+/* ========================================================
+   ENHANCED POS MODULES (MICRO-DONATIONS, TRANSFERS, RECON, HYDRATION)
+   ======================================================== */
+
+/* Micro-Donations & Excess Tender (Section 1.1) */
+.btn-donation-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #FDF2F8;
+  color: #DB2777;
+  border: 1px solid #FBCFE8;
+  border-radius: 9999px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-donation-link:hover, .btn-donation-link.active {
+  background: #FCE7F3;
+  color: #BE185D;
+  border-color: #F472B6;
+}
+
+body:not(.light-theme) .btn-donation-link {
+  background: rgba(219, 39, 119, 0.15);
+  border-color: rgba(219, 39, 119, 0.35);
+  color: #F472B6;
+}
+
+.donation-excess-box {
+  background: var(--bg-surface-elevated);
+  border: 1.5px solid #FBCFE8;
+  border-radius: 18px;
+  padding: 14px 16px;
+  margin-top: 12px;
+  margin-bottom: 6px;
+  box-shadow: 0 4px 14px rgba(219, 39, 119, 0.08);
+  animation: fadeInDown 0.2s ease-out;
+}
+
+body:not(.light-theme) .donation-excess-box {
+  background: #0E1626;
+  border-color: rgba(219, 39, 119, 0.3);
+}
+
+.donation-box-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.donation-box-title {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #DB2777;
+}
+
+body:not(.light-theme) .donation-box-title {
+  color: #F472B6;
+}
+
+.donation-box-close {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  line-height: 1;
+  padding: 2px 6px;
+}
+
+.quick-tender-pills {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-tender-chip {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-tender-chip:hover, .btn-tender-chip.active {
+  background: #EFF6FF;
+  border-color: #0066FF;
+  color: #0066FF;
+}
+
+.donation-change-card {
+  margin-top: 10px;
+  background: #FFF1F2;
+  border: 1px solid #FECDD3;
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+body:not(.light-theme) .donation-change-card {
+  background: rgba(225, 29, 72, 0.12);
+  border-color: rgba(225, 29, 72, 0.3);
+}
+
+.donation-checkbox-label {
+  margin: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #9F1239;
+}
+
+body:not(.light-theme) .donation-checkbox-label {
+  color: #FDA4AF;
+}
+
+/* Inter-Counter Transfer Handshake Banner (Section 1.2) */
+.transfer-handshake-banner {
+  background: #EFF6FF;
+  border: 1.5px solid #BFDBFE;
+  border-left: 5px solid #0066FF;
+  border-radius: 16px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  animation: pulseSubtle 3s infinite ease-in-out;
+}
+
+body:not(.light-theme) .transfer-handshake-banner {
+  background: #0D1B36;
+  border-color: #1E3A8A;
+  border-left-color: #3B82F6;
+}
+
+.transfer-banner-info h4 {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #1E40AF;
+  margin: 0 0 3px;
+}
+
+body:not(.light-theme) .transfer-banner-info h4 {
+  color: #93C5FD;
+}
+
+.transfer-banner-info p {
+  font-size: 0.82rem;
+  color: #1E3A8A;
+  margin: 0;
+  font-weight: 500;
+}
+
+body:not(.light-theme) .transfer-banner-info p {
+  color: #BFDBFE;
+}
+
+.transfer-banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-transfer-accept {
+  background: #0066FF;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 102, 255, 0.3);
+  transition: all var(--transition-fast);
+}
+
+.btn-transfer-reject {
+  background: transparent;
+  color: #EF4444;
+  border: 1.5px solid #FCA5A5;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-transfer-reject:hover {
+  background: #FEE2E2;
+}
+
+/* Inter-Counter Exchange Modal Segments */
+.exchange-segmented-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  background: var(--bg-surface-elevated);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 16px;
+}
+
+.exchange-segment-btn {
+  background: transparent;
+  border: none;
+  border-radius: 9px;
+  padding: 10px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.exchange-segment-btn.active {
+  background: var(--color-brand-blue);
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(0, 102, 255, 0.25);
+}
+
+/* Fast Denomination Reset Button (Section 1.4) */
+.btn-denom-reset {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 9999px;
+  padding: 5px 11px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-denom-reset:hover {
+  background: #FEE2E2;
+  border-color: #FCA5A5;
+  color: #DC2626;
+}
+
+/* JSON Disaster Recovery Restore Modal (Section 2 & 3) */
+.restore-summary-card {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-top: 10px;
+}
+
+.restore-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+.restore-meta-label {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.restore-counts-chips {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-subtle);
+}
+
+.count-chip {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.policy-radio-card {
+  display: flex;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-surface-elevated);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.policy-radio-card.active {
+  border-color: #0066FF;
+  background: #F0F7FF;
+}
+
+body:not(.light-theme) .policy-radio-card.active {
+  background: rgba(0, 102, 255, 0.12);
+  border-color: #3B82F6;
+}
