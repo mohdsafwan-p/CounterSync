@@ -22,7 +22,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800;900&family=Manjari:wght@400;700&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- Bulletproof Standalone CSS -->
-  <link rel="stylesheet" href="./css/style.css?v=22">
+  <link rel="stylesheet" href="./css/style.css?v=23">
 </head>
 <body>
   <div id="app">
@@ -514,7 +514,7 @@
                   <div class="calc-head-sub">Count physical currency against logged sales</div>
                 </div>
               </div>
-              <div style="display: flex; gap: 8px; align-items: center;">
+              <div class="calc-head-actions">
                 <button type="button" id="btn-reset-denominations" class="btn-denom-reset" title="Reset all counts to 0">
                   ↺ Reset
                 </button>
@@ -592,6 +592,10 @@
 
             <!-- Reconciliation Summary Bar -->
             <div class="eod-recon-summary-bar">
+              <div class="summary-col">
+                <div class="summary-col-title">EXPECTED CASH</div>
+                <div class="summary-col-val" id="recon-expected-cash-summary" style="color: #10B981;">₹0</div>
+              </div>
               <div class="summary-col">
                 <div class="summary-col-title">COUNTED PHYSICAL CASH</div>
                 <div class="summary-col-val" id="recon-counted-cash">₹0</div>
@@ -2007,7 +2011,7 @@
   <script src="./js/firebase-config.js?v=20"></script>
   <script src="./js/qrcode.js?v=20"></script>
   <script src="./js/seed.js?v=20"></script>
-  <script src="./js/store.js?v=22"></script>
-  <script src="./js/app.js?v=22"></script>
+  <script src="./js/store.js?v=23"></script>
+  <script src="./js/app.js?v=23"></script>
 </body>
 </html>

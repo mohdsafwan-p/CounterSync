@@ -1267,6 +1267,14 @@ body.light-theme .landing-title {
   justify-content: center;
 }
 
+.qr-code-svg-wrap svg {
+  max-width: 100% !important;
+  max-height: 100% !important;
+  width: auto !important;
+  height: auto !important;
+  display: block;
+}
+
 .upi-app-logos {
   display: flex;
   align-items: center;
@@ -2865,6 +2873,55 @@ button, input, select, textarea, .intent-card, .btn-qty-card, .btn-pay-mode, .do
     box-shadow: 2px 0 6px rgba(0, 0, 0, 0.08);
   }
 
+  /* Tab 4: Cash Reconciliation Mobile Optimization */
+  .eod-calc-card {
+    padding: 14px 12px !important;
+  }
+
+  .eod-calc-head {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .calc-head-left {
+    width: 100% !important;
+  }
+
+  .calc-head-actions {
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+  }
+
+  .calc-expected-pill {
+    font-size: 0.84rem !important;
+    padding: 5px 11px !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .eod-recon-summary-bar {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    justify-content: space-between !important;
+  }
+
+  .eod-recon-summary-bar .summary-col {
+    flex: 1 1 45% !important;
+    min-width: 0 !important;
+  }
+
+  .eod-recon-summary-bar .summary-col.text-right {
+    flex: 1 1 100% !important;
+    text-align: left !important;
+    padding-top: 8px !important;
+    border-top: 1px dashed var(--border-subtle) !important;
+  }
+
   /* Touch-action and tap speed optimizations */
   button,
   .intent-card,
@@ -3659,17 +3716,20 @@ body:not(.light-theme) .btn-qty-card.active {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 14px;
-  gap: 8px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .calc-head-left {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
 .calc-head-icon {
   font-size: 1.3rem;
+  flex-shrink: 0;
 }
 
 .calc-head-title {
@@ -3683,11 +3743,32 @@ body:not(.light-theme) .btn-qty-card.active {
   color: var(--text-muted);
 }
 
+.calc-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .calc-expected-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
   color: #10B981;
   font-weight: 800;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  white-space: nowrap;
   flex-shrink: 0;
+}
+
+body.light-theme .calc-expected-pill {
+  background: #ECFDF5;
+  border-color: #A7F3D0;
+  color: #059669;
 }
 
 .eod-notes-grid {
@@ -3746,6 +3827,7 @@ body.light-theme .eod-note-box {
   border-top: 1.5px solid var(--border-subtle);
   padding-top: 14px;
   margin-top: 8px;
+  gap: 12px;
 }
 
 .summary-col-title {

@@ -1756,6 +1756,68 @@
     }
   }
 
+  function openUpiQrModal(counter, grandTotal) {
+    if (!el.modalUpiQr) return;
+    const activeCounter = counter || CS_Store.getCounter(state.eventKey, state.counterId);
+    const event = CS_Store.getEvent(state.eventKey);
+    const upiId = (activeCounter && activeCounter.upiId)
+      ? activeCounter.upiId
+      : (event && event.upiId ? event.upiId : 'cs.counter01a@okhdfcbank');
+    const payeeName = (activeCounter && (activeCounter.upiName || activeCounter.name))
+      ? (activeCounter.upiName || activeCounter.name)
+      : (event && event.name ? event.name : 'CounterSync POS');
+    const amountVal = Number(grandTotal || 0);
+    const amountStr = amountVal.toFixed(2);
+    const note = `${state.eventKey || 'CounterSync'} ${activeCounter ? activeCounter.name : 'Counter'} Sale`;
+
+    // Standard NPCI / RBI UPI payment intent URI
+    const upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}&am=${amountStr}&cu=INR&tn=${encodeURIComponent(note)}`;
+    state.activeUpiUri = upiUri;
+
+    if (el.qrModalAmount) {
+      el.qrModalAmount.textContent = `₹${amountVal.toLocaleString('en-IN')}`;
+    }
+    if (el.qrModalUpiId) {
+      el.qrModalUpiId.textContent = upiId;
+    }
+
+    const qrContainer = el.upiQrRenderBox || document.getElementById('upi-qr-render-box');
+    if (qrContainer) {
+      qrContainer.innerHTML = '';
+      if (typeof QRCode !== 'undefined') {
+        try {
+          state.activeUpiQrCode = new QRCode(qrContainer, {
+            text: upiUri,
+            width: 220,
+            height: 220,
+            colorDark: '#0B132B',
+            colorLight: '#FFFFFF',
+            correctLevel: (typeof QRCode !== 'undefined' && QRCode.CorrectLevel) ? QRCode.CorrectLevel.M : 0
+          });
+        } catch (err) {
+          console.error("QR render error:", err);
+          qrContainer.innerHTML = `<div style="padding:20px; font-size:0.85rem; color:var(--text-muted);">Scan via UPI ID: <strong>${upiId}</strong><br><small>Amount: ₹${amountStr}</small></div>`;
+        }
+      } else {
+        qrContainer.innerHTML = `<div style="padding:20px; font-size:0.85rem; color:var(--text-muted);">UPI ID: <strong>${upiId}</strong></div>`;
+      }
+    }
+
+    function handleUpiKeydown(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        document.removeEventListener('keydown', handleUpiKeydown);
+        if (el.modalUpiQr) el.modalUpiQr.classList.add('hidden');
+      }
+    }
+    document.addEventListener('keydown', handleUpiKeydown);
+
+    el.modalUpiQr.classList.remove('hidden');
+    if (typeof CS_Audio !== 'undefined' && CS_Audio.playTone) {
+      CS_Audio.playTone(600, 'sine', 0.1);
+    }
+  }
+
   function executeSale(saleData) {
     try {
       const txn = CS_Store.recordSale({
@@ -2523,7 +2585,15 @@
     const expectedCash = breakdown ? breakdown.cashCollection : 0;
 
     const expectedCashEl = document.getElementById('recon-expected-cash');
-    if (expectedCashEl) expectedCashEl.textContent = `₹${expectedCash.toLocaleString('en-IN')}`;
+    if (expectedCashEl) {
+      expectedCashEl.textContent = `₹${expectedCash.toLocaleString('en-IN')}`;
+      expectedCashEl.dataset.expected = expectedCash;
+    }
+
+    const expectedCashSummaryEl = document.getElementById('recon-expected-cash-summary');
+    if (expectedCashSummaryEl) {
+      expectedCashSummaryEl.textContent = `₹${expectedCash.toLocaleString('en-IN')}`;
+    }
 
     const countedCashEl = document.getElementById('recon-counted-cash');
     if (countedCashEl) countedCashEl.textContent = `₹${countedTotal.toLocaleString('en-IN')}`;
@@ -2548,7 +2618,8 @@
   }
 
   function handleSaveReconciliation() {
-    const expected = parseInt(document.getElementById('recon-expected-cash').dataset.expected, 10) || 0;
+    const expectedEl = document.getElementById('recon-expected-cash');
+    const expected = parseInt(expectedEl ? (expectedEl.dataset.expected || expectedEl.textContent.replace(/[^\d]/g, '')) : 0, 10) || 0;
     let grandCounted = 0;
     const denoms = { 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0 };
 
