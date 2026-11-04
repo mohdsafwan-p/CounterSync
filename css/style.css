@@ -4696,3 +4696,20 @@ body:not(.light-theme) .policy-radio-card.active {
   background: #EF4444;
   color: #FFFFFF;
 }
+
+/* End of Day Stockroom Cash Deposit Banner */
+.eod-deposit-stockroom-banner {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1.5px solid rgba(16, 185, 129, 0.32);
+}
+.eod-deposit-stockroom-banner:hover {
+  border-color: rgba(16, 185, 129, 0.6);
+}
+.sr-btn-accept-cash:hover {
+  background: #10B981 !important;
+  color: #FFFFFF !important;
+}
+.sr-btn-reject-cash:hover {
+  background: #EF4444 !important;
+  color: #FFFFFF !important;
+}

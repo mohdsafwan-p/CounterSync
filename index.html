@@ -22,7 +22,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800;900&family=Manjari:wght@400;700&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- Bulletproof Standalone CSS -->
-  <link rel="stylesheet" href="./css/style.css?v=23">
+  <link rel="stylesheet" href="./css/style.css?v=24">
 </head>
 <body>
   <div id="app">
@@ -490,7 +490,21 @@
 
         <!-- TAB 4: END OF DAY (Image 4) -->
         <div id="tab-pane-endofday" class="dock-content-pane hidden">
-          <!-- 1. Inter-Counter Transfer Card (Requirement 2 UI Text Updates) -->
+          <!-- 1. Deposit Collection to Stockroom Card -->
+          <div class="eod-transfer-banner eod-deposit-stockroom-banner" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(5, 150, 105, 0.05)); border: 1px solid rgba(16, 185, 129, 0.35); margin-bottom: 12px;">
+            <div class="eod-transfer-info">
+              <div class="eod-transfer-title-row">
+                <span class="eod-transfer-icon" style="background: rgba(16, 185, 129, 0.2); color: #10B981;">🏦</span>
+                <span class="eod-transfer-heading" style="color: #10B981;">Deposit Collection to Stockroom</span>
+              </div>
+              <div class="eod-transfer-desc">Securely transfer physical cash collection to the Central Stockroom vault</div>
+            </div>
+            <button type="button" class="btn-transfer-blue" id="btn-open-deposit-stockroom" style="background: #10B981; border-color: #10B981;">
+              Deposit Cash
+            </button>
+          </div>
+
+          <!-- 2. Inter-Counter Transfer Card (Requirement 2 UI Text Updates) -->
           <div class="eod-transfer-banner">
             <div class="eod-transfer-info">
               <div class="eod-transfer-title-row">
@@ -504,7 +518,7 @@
             </button>
           </div>
 
-          <!-- 2. Cash Reconciliation Calculator Card -->
+          <!-- 3. Cash Reconciliation Calculator Card -->
           <div class="eod-calc-card">
             <div class="eod-calc-head">
               <div class="calc-head-left">
@@ -725,9 +739,15 @@
             <div id="sr-kpi-giveaway" class="kpi-tile-value text-amber">50</div>
             <div class="kpi-tile-sub">Direct VIP & Free Copies</div>
           </div>
+
+          <div class="kpi-tile" style="border-top: 4px solid #10B981; background: rgba(16, 185, 129, 0.05);">
+            <div class="kpi-tile-title">Stock Room Cash Vault</div>
+            <div id="sr-kpi-cash-vault" class="kpi-tile-value text-emerald">₹0</div>
+            <div class="kpi-tile-sub">Total cash deposited by counters</div>
+          </div>
         </div>
 
-        <!-- Warehouse Action Form Cards (The 3 Action Cards) -->
+        <!-- Warehouse Action Form Cards (The 4 Action Cards) -->
         <div class="stock-action-cards">
           <!-- 3.3 Counter Stock Dispatches -->
           <div class="stock-action-card">
@@ -793,6 +813,61 @@
               Apply Press Correction
             </button>
           </div>
+
+          <!-- 3.5 Transfer Money to Counter (Float / Change) -->
+          <div class="stock-action-card" style="border-top: 3px solid #10B981;">
+            <h3 style="color: #10B981;">💰 Transfer Money to Counter</h3>
+            <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 12px;">
+              Disburse morning cash float or change to active counter desks.
+            </p>
+            <div style="margin-bottom: 10px;">
+              <label class="input-label" for="sr-cash-target-counter">Select Destination Counter</label>
+              <select id="sr-cash-target-counter"></select>
+            </div>
+            <div style="margin-bottom: 10px;">
+              <label class="input-label" for="sr-cash-transfer-amount">Amount to Transfer (₹)</label>
+              <input type="number" id="sr-cash-transfer-amount" value="1000" min="10" step="10" placeholder="e.g. 1000">
+            </div>
+            <div style="margin-bottom: 14px;">
+              <label class="input-label" for="sr-cash-transfer-notes">Notes / Reason</label>
+              <input type="text" id="sr-cash-transfer-notes" placeholder="e.g. Opening cash float / Change fund" value="Opening cash float">
+            </div>
+            <button id="btn-submit-sr-cash-transfer" class="btn-complete-sale" style="height: 44px; font-size: 0.95rem; background: linear-gradient(135deg, #10B981, #059669);">
+              Send Cash Float →
+            </button>
+          </div>
+        </div>
+
+        <!-- Counter Cash Deposits & Float Transfers Table -->
+        <div class="data-table-wrapper" style="margin-bottom: 24px;">
+          <div class="data-table-header">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <h3 style="display: flex; align-items: center; gap: 8px;">
+                <span>💰 Counter Cash Deposits & Transfers</span>
+              </h3>
+              <span class="stock-pill" id="sr-pending-cash-count" style="background: rgba(16, 185, 129, 0.15); color: #10B981;">0 Pending</span>
+            </div>
+            <div style="font-size: 0.82rem; color: var(--text-secondary);">
+              Vault Total: <strong id="sr-total-vault-cash" style="color: #10B981; font-weight: 800;">₹0</strong> physical cash
+            </div>
+          </div>
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th>Transfer ID</th>
+                <th>Direction</th>
+                <th>Counter</th>
+                <th>Amount</th>
+                <th>Time</th>
+                <th>Status</th>
+                <th>Authorized / Memo</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="sr-cash-transfers-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
         </div>
 
         <!-- 3rd From Bottom: Counter Low Stock Requests Monitor -->
@@ -1709,7 +1784,7 @@
             <button type="button" id="btn-vip-qty-minus" class="stepper-circle-btn">−</button>
             <input type="number" id="input-vip-qty" class="vip-qty-input font-mono" value="1" min="1" max="999" readonly>
             <button type="button" id="btn-vip-qty-plus" class="stepper-circle-btn">+</button>
-            <span id="vip-stock-hint" style="font-size: 0.82rem; color: var(--text-muted); margin-left: 8px; font-weight: 700;">(Available: 100)</span>
+            <span id="vip-stock-hint" style="font-size: 0.82rem; color: var(--text-muted); margin-left: 8px; font-weight: 700;">(Available: --)</span>
           </div>
         </div>
 
@@ -1733,6 +1808,64 @@
           <button type="button" id="btn-confirm-vip-ok" class="btn-confirm-vip press-effect" style="height: 48px; background: #9333EA; color: #FFFFFF; font-weight: 800; font-size: 1rem; border-radius: 14px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
             <span>✓ OK</span>
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Deposit Collection to Stockroom Modal -->
+    <div id="modal-deposit-stockroom" class="modal-overlay hidden">
+      <div class="modal-content" style="max-width: 440px;">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.4rem;">🏦</span>
+            <h3 style="color: #10B981; font-weight: 800; margin: 0;">Deposit Collection to Stockroom</h3>
+          </div>
+          <button class="modal-close-btn" data-close-modal="modal-deposit-stockroom">✕</button>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;">
+          Transfer collected cash from counter cash drawer directly to the Central Stockroom vault.
+        </p>
+
+        <!-- Current Cash in Drawer -->
+        <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 12px 14px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Cash In Drawer</div>
+            <div id="deposit-avail-cash-val" style="font-size: 1.35rem; font-weight: 800; color: #10B981; font-family: monospace;">₹0</div>
+          </div>
+          <button type="button" id="btn-deposit-all-cash" class="btn-pill" style="background: rgba(16, 185, 129, 0.2); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.4); font-size: 0.78rem; font-weight: 700; padding: 6px 12px;">
+            Deposit Full Amount
+          </button>
+        </div>
+
+        <!-- Amount Input -->
+        <div style="margin-bottom: 14px;">
+          <label class="input-label" for="deposit-stockroom-amount">Deposit Amount (₹) *</label>
+          <input type="number" id="deposit-stockroom-amount" class="font-mono" placeholder="e.g. 5000" min="1" step="1" style="font-size: 1.2rem; font-weight: 700;">
+        </div>
+
+        <!-- Staff / Deposited By -->
+        <div style="margin-bottom: 14px;">
+          <label class="input-label" for="deposit-stockroom-staff">Authorized Staff / Deposited By</label>
+          <input type="text" id="deposit-stockroom-staff" placeholder="e.g. Counter Volunteer">
+        </div>
+
+        <!-- Notes / Remarks -->
+        <div style="margin-bottom: 20px;">
+          <label class="input-label" for="deposit-stockroom-notes">Notes / Memo (Optional)</label>
+          <input type="text" id="deposit-stockroom-notes" placeholder="e.g. End of day cash collection deposit" value="End of day cash collection deposit">
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 10px;">
+          <button type="button" class="btn-pill btn-pill-subtle" data-close-modal="modal-deposit-stockroom" style="height: 48px; font-weight: 700;">
+            Cancel
+          </button>
+          <button type="button" id="btn-confirm-deposit-stockroom" class="btn-confirm-sale press-effect" style="height: 48px; background: linear-gradient(135deg, #10B981, #059669); color: #FFFFFF; font-weight: 800; font-size: 1rem; border-radius: 14px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <span>Confirm Deposit →</span>
+          </button>
+        </div>
+      </div>
+    </div>
         </div>
       </div>
     </div>
@@ -2011,7 +2144,7 @@
   <script src="./js/firebase-config.js?v=20"></script>
   <script src="./js/qrcode.js?v=20"></script>
   <script src="./js/seed.js?v=20"></script>
-  <script src="./js/store.js?v=23"></script>
-  <script src="./js/app.js?v=23"></script>
+  <script src="./js/store.js?v=24"></script>
+  <script src="./js/app.js?v=24"></script>
 </body>
 </html>

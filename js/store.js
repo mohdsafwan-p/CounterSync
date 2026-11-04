@@ -530,6 +530,8 @@ class CounterSyncStore {
     try {
       sessionStorage.removeItem(this.SESSION_KEY);
       localStorage.removeItem(this.SESSION_KEY);
+      sessionStorage.removeItem('countersync_session_unlocked');
+      localStorage.removeItem('countersync_app_closed_lock');
     } catch (e) {}
     this._notifySubscribers('SESSION_CLEAR', null);
   }
@@ -642,12 +644,44 @@ class CounterSyncStore {
   // --- Counters CRUD ---
   getCounters(eventKey) {
     const event = this.getEvent(eventKey);
-    return event ? event.counters : [];
+    if (!event) return [];
+    // Ensure all counters have live synchronized currentStock
+    try {
+      this.getBalancedLedgerMetrics(eventKey, "ALL");
+    } catch (e) {}
+    return event.counters || [];
   }
 
   getCounter(eventKey, counterId) {
-    const counters = this.getCounters(eventKey);
-    return counters.find(c => c.id === counterId) || null;
+    const data = this.getData();
+    const event = data.events ? data.events[eventKey] : null;
+    if (!event || !event.counters) return null;
+    const counter = event.counters.find(c => c.id === counterId);
+    if (!counter) return null;
+
+    // Dynamically calculate accurate physical shelf stock for 100% mathematical integrity
+    try {
+      const allCounterTxns = (event.transactions || []).filter(t => t.counterId === counter.id && !t.voided);
+      const allTimeSold = allCounterTxns.filter(t => t.type === "SALE" || t.type === "PREORDER_FULFILLMENT").reduce((s, t) => s + (t.copies || 0), 0);
+      const allTimeVip = allCounterTxns.filter(t => t.paymentMode === "FREE_VIP" || t.type === "VIP").reduce((s, t) => s + (t.copies || 0), 0);
+
+      const acceptedDispatches = (event.dispatches || [])
+        .filter(d => d.counterId === counter.id && d.status === "ACCEPTED")
+        .reduce((s, d) => s + d.copies, 0);
+
+      const transfersReceived = (event.transfers || [])
+        .filter(t => (t.toCounterId === counter.id || t.to_counter === counter.id) && (t.type === "BOOKS" || !t.type) && t.status === "ACCEPTED")
+        .reduce((s, t) => s + (t.copies || t.amountOrQuantity || t.amount_or_quantity || 0), 0);
+
+      const transfersSent = (event.transfers || [])
+        .filter(t => (t.fromCounterId === counter.id || t.from_counter === counter.id) && (t.type === "BOOKS" || !t.type) && (t.status === "ACCEPTED" || t.status === "PENDING"))
+        .reduce((s, t) => s + (t.copies || t.amountOrQuantity || t.amount_or_quantity || 0), 0);
+
+      const stockSupplied = (counter.initialStock || 0) + acceptedDispatches + transfersReceived - transfersSent;
+      counter.currentStock = Math.max(0, stockSupplied - allTimeSold - allTimeVip);
+    } catch (e) {}
+
+    return counter;
   }
 
   saveCounter(eventKey, counterData) {
@@ -993,17 +1027,21 @@ class CounterSyncStore {
     const counter = event.counters.find(c => c.id === counterId);
     if (!counter) throw new Error("Counter not found");
 
+    // Recalculate dynamic shelf stock to guarantee mathematical integrity
+    const liveCounter = this.getCounter(eventKey, counterId);
+    const availableStock = liveCounter ? liveCounter.currentStock : counter.currentStock;
+
     const count = parseInt(copies, 10);
     if (isNaN(count) || count <= 0) throw new Error("Invalid quantity");
-    if (counter.currentStock < count) {
-      throw new Error(`Insufficient stock for complimentary handover! Available: ${counter.currentStock}`);
+    if (availableStock < count) {
+      throw new Error(`Insufficient stock for complimentary handover! Available: ${availableStock}`);
     }
 
     if (!recipientName || !recipientName.trim()) {
       throw new Error("Recipient Name is mandatory for VIP complimentary records");
     }
 
-    counter.currentStock -= count;
+    counter.currentStock = Math.max(0, availableStock - count);
 
     const volunteerStaff = issuedBy && issuedBy.trim() ? issuedBy.trim() : (counter.volunteers || "Volunteer Staff");
 
@@ -1042,26 +1080,44 @@ class CounterSyncStore {
     const count = parseInt(amountOrQuantity, 10);
     if (isNaN(count) || count <= 0) throw new Error("Please enter a valid positive quantity or amount");
 
-    const source = event.counters.find(c => c.id === fromCounterId);
-    const dest = event.counters.find(c => c.id === toCounterId);
+    // Support 'stockroom' as a virtual counter entity
+    const source = fromCounterId === 'stockroom'
+      ? { id: 'stockroom', name: 'Central Stock Room', isStockroom: true }
+      : event.counters.find(c => c.id === fromCounterId);
+
+    const dest = toCounterId === 'stockroom'
+      ? { id: 'stockroom', name: 'Central Stock Room', isStockroom: true }
+      : event.counters.find(c => c.id === toCounterId);
 
     if (!source || !dest) throw new Error("Counter not found");
 
     const transferType = (type || "BOOKS").toUpperCase();
 
     if (transferType === "BOOKS") {
-      if (source.currentStock < count) {
-        throw new Error(`Insufficient copies! Counter ${source.name} has only ${source.currentStock} copies available.`);
+      if (source.isStockroom) {
+        if ((event.stockRoom.vaultReserve || 0) < count) {
+          throw new Error(`Insufficient stock in Stock Room! Available: ${event.stockRoom.vaultReserve}`);
+        }
+        event.stockRoom.vaultReserve -= count;
+      } else {
+        const liveSource = this.getCounter(eventKey, source.id) || source;
+        if (liveSource.currentStock < count) {
+          throw new Error(`Insufficient copies! Counter ${source.name} has only ${liveSource.currentStock} copies available.`);
+        }
+        // Hold/reserve copies immediately on sender so they cannot be double-sold while in-flight
+        source.currentStock = Math.max(0, liveSource.currentStock - count);
       }
-      // Hold/reserve copies immediately on sender so they cannot be double-sold while in-flight
-      source.currentStock -= count;
     } else if (transferType === "CASH") {
-      // Calculate sender's current cash in drawer
-      const metrics = this.getBalancedLedgerMetrics(eventKey, "ALL");
-      const senderBreakdown = metrics ? metrics.counterBreakdown.find(b => b.id === source.id) : null;
-      const availableCash = senderBreakdown ? senderBreakdown.cashCollection : 0;
-      if (availableCash < count) {
-        throw new Error(`Insufficient cash float! Counter ${source.name} has only ₹${availableCash} cash recorded.`);
+      if (source.isStockroom) {
+        // Stock room disbursing cash float to counter
+      } else {
+        // Calculate sender counter's current cash in drawer
+        const metrics = this.getBalancedLedgerMetrics(eventKey, "ALL");
+        const senderBreakdown = metrics ? metrics.counterBreakdown.find(b => b.id === source.id) : null;
+        const availableCash = senderBreakdown ? senderBreakdown.cashCollection : 0;
+        if (availableCash < count) {
+          throw new Error(`Insufficient cash! Counter ${source.name} has only ₹${availableCash} cash recorded.`);
+        }
       }
     } else {
       throw new Error("Transfer type must be BOOKS or CASH");
@@ -1084,13 +1140,13 @@ class CounterSyncStore {
       amount_or_quantity: count,
       copies: transferType === "BOOKS" ? count : 0,
       cashAmount: transferType === "CASH" ? count : 0,
-      notes: notes || (transferType === "CASH" ? "Float change transfer" : "Inter-counter books transfer"),
+      notes: notes || (transferType === "CASH" ? (source.isStockroom ? "Cash float disbursement" : "Cash collection deposit to stockroom") : "Inter-counter books transfer"),
       status: "PENDING",
       initiated_at: nowIso,
       timestamp: nowIso,
       resolved_at: null,
       resolved_by: null,
-      authorizedBy: authorizedBy || "Counter Staff"
+      authorizedBy: authorizedBy || (source.isStockroom ? "Stock Room Keeper" : "Counter Staff")
     };
 
     if (!event.transfers) event.transfers = [];
@@ -1113,13 +1169,18 @@ class CounterSyncStore {
       throw new Error(`Transfer has already been ${transfer.status}`);
     }
 
-    const source = event.counters.find(c => c.id === transfer.fromCounterId);
-    const dest = event.counters.find(c => c.id === transfer.toCounterId);
+    const source = transfer.fromCounterId === 'stockroom'
+      ? { id: 'stockroom', name: 'Central Stock Room', isStockroom: true }
+      : event.counters.find(c => c.id === transfer.fromCounterId);
+
+    const dest = transfer.toCounterId === 'stockroom'
+      ? { id: 'stockroom', name: 'Central Stock Room', isStockroom: true }
+      : event.counters.find(c => c.id === transfer.toCounterId);
 
     const nowIso = new Date().toISOString();
     const act = (action || response || "").toUpperCase();
     const isAccept = act === "ACCEPT" || act === "ACCEPTED";
-    const resolver = responderName || authorizedBy || "Receiving Counter Staff";
+    const resolver = responderName || authorizedBy || (dest && dest.isStockroom ? "Stock Room Keeper" : "Receiving Counter Staff");
 
     if (isAccept) {
       transfer.status = "ACCEPTED";
@@ -1127,21 +1188,28 @@ class CounterSyncStore {
       transfer.resolved_by = resolver;
 
       // If BOOKS, credit to receiver (sender stock was already deducted/held upon initiate)
-      if (transfer.type === "BOOKS" && dest) {
-        dest.currentStock += (transfer.copies || transfer.amountOrQuantity || 0);
+      if (transfer.type === "BOOKS") {
+        if (dest && dest.isStockroom) {
+          event.stockRoom.vaultReserve = (event.stockRoom.vaultReserve || 0) + (transfer.copies || transfer.amountOrQuantity || 0);
+        } else if (dest) {
+          dest.currentStock += (transfer.copies || transfer.amountOrQuantity || 0);
+        }
       }
-      // If CASH, cash collection balances update automatically:
-      // receiver gains cashTransfersReceived, sender already has cashTransfersSent.
+      // If CASH, cash collection balances update automatically via balanced ledger
     } else {
       transfer.status = "REJECTED";
       transfer.resolved_at = nowIso;
       transfer.resolved_by = resolver;
 
       // If BOOKS, release reserved stock back to sender (Rollback)
-      if (transfer.type === "BOOKS" && source) {
-        source.currentStock += (transfer.copies || transfer.amountOrQuantity || 0);
+      if (transfer.type === "BOOKS") {
+        if (source && source.isStockroom) {
+          event.stockRoom.vaultReserve = (event.stockRoom.vaultReserve || 0) + (transfer.copies || transfer.amountOrQuantity || 0);
+        } else if (source) {
+          source.currentStock += (transfer.copies || transfer.amountOrQuantity || 0);
+        }
       }
-      // If CASH, sender's deduction is cancelled because status is now REJECTED (only PENDING/ACCEPTED are deducted).
+      // If CASH, sender's deduction is cancelled because status is now REJECTED
     }
 
     this.saveData(data);
@@ -1244,6 +1312,32 @@ class CounterSyncStore {
     const event = this.getEvent(eventKey);
     if (!event || !event.transfers) return [];
     return event.transfers.filter(t => (t.toCounterId === counterId || t.to_counter === counterId) && t.status === "PENDING");
+  }
+
+  // Stock Room Cash & Transfers Helpers
+  getStockRoomCashBalance(eventKey) {
+    const event = this.getEvent(eventKey);
+    if (!event) return 0;
+    const acceptedDeposits = (event.transfers || [])
+      .filter(t => (t.toCounterId === 'stockroom' || t.to_counter === 'stockroom') && t.type === 'CASH' && t.status === 'ACCEPTED')
+      .reduce((sum, t) => sum + (t.cashAmount || t.amountOrQuantity || t.amount_or_quantity || 0), 0);
+    const sentFloats = (event.transfers || [])
+      .filter(t => (t.fromCounterId === 'stockroom' || t.from_counter === 'stockroom') && t.type === 'CASH' && (t.status === 'ACCEPTED' || t.status === 'PENDING'))
+      .reduce((sum, t) => sum + (t.cashAmount || t.amountOrQuantity || t.amount_or_quantity || 0), 0);
+    return Math.max(0, acceptedDeposits - sentFloats);
+  }
+
+  getPendingTransfersForStockRoom(eventKey) {
+    return this.getPendingTransfersForCounter(eventKey, 'stockroom');
+  }
+
+  getAllTransfersForStockRoom(eventKey) {
+    const event = this.getEvent(eventKey);
+    if (!event || !event.transfers) return [];
+    return event.transfers.filter(t => 
+      t.toCounterId === 'stockroom' || t.to_counter === 'stockroom' || 
+      t.fromCounterId === 'stockroom' || t.from_counter === 'stockroom'
+    );
   }
 
   // --- Pre-Order Fulfillment ---
@@ -1450,8 +1544,8 @@ class CounterSyncStore {
       : 0;
     const netPressInflow = baseInflow + correctionNet;
 
-    // 2. Copies Sold
-    const validSalesTxns = txns.filter(t => !t.voided && (t.type === "SALE" || (t.type === "PREORDER_FULFILLMENT" && t.totalAmount > 0)));
+    // 2. Copies Sold (includes standard sales and fulfilled pre-orders)
+    const validSalesTxns = txns.filter(t => !t.voided && (t.type === "SALE" || t.type === "PREORDER_FULFILLMENT"));
     const totalCopiesSold = validSalesTxns.reduce((sum, t) => sum + (t.copies || 0), 0);
 
     // 3. VIP / Complimentary Handover
@@ -1462,17 +1556,6 @@ class CounterSyncStore {
 
     // 4. Reserve in Central Stock Room
     const reserveInStockRoom = event.stockRoom ? event.stockRoom.vaultReserve : 0;
-
-    // 5. Stock Active in Counters
-    const activeCountersStock = (event.counters || []).reduce((sum, c) => sum + (c.currentStock || 0), 0);
-    
-    // In-transit stock
-    const inTransitStock = (event.dispatches || [])
-      .filter(d => d.status === "IN_TRANSIT")
-      .reduce((sum, d) => sum + (d.copies || 0), 0);
-
-    // 6. Grand Unsold Balance
-    const grandUnsoldBalance = reserveInStockRoom + activeCountersStock + inTransitStock;
 
     // Financial KPIs
     const nonVoidedTxns = txns.filter(t => !t.voided);
@@ -1495,11 +1578,11 @@ class CounterSyncStore {
     const fulfilledPreOrders = preOrders.filter(p => p.status === "FULFILLED").length;
     const pendingPreOrders = preOrders.filter(p => p.status === "PENDING").length;
 
-    // Counter Breakdown with 100% Mathematical Ledger Reconciliation
+    // Counter Breakdown with 100% Mathematical Ledger Reconciliation (Calculated First)
     const counterBreakdown = (event.counters || []).map(counter => {
-      // 1. All-time non-voided transactions for this counter
+      // 1. All-time non-voided transactions for this counter (all sales & pre-orders fulfilled)
       const allCounterTxns = (event.transactions || []).filter(t => t.counterId === counter.id && !t.voided);
-      const allTimeSold = allCounterTxns.filter(t => (t.paymentMode === "CASH" || t.paymentMode === "UPI") && (t.type === "SALE" || t.type === "PREORDER_FULFILLMENT")).reduce((s, t) => s + (t.copies || 0), 0);
+      const allTimeSold = allCounterTxns.filter(t => t.type === "SALE" || t.type === "PREORDER_FULFILLMENT").reduce((s, t) => s + (t.copies || 0), 0);
       const allTimeVip = allCounterTxns.filter(t => t.paymentMode === "FREE_VIP" || t.type === "VIP").reduce((s, t) => s + (t.copies || 0), 0);
 
       // 2. Total physical stock supplied = initial allocation + accepted dispatches + net accepted book transfers
@@ -1526,10 +1609,10 @@ class CounterSyncStore {
       const cTxns = nonVoidedTxns.filter(t => t.counterId === counter.id);
       const rawCash = cTxns.filter(t => t.paymentMode === "CASH").reduce((s, t) => s + (t.totalAmount || 0), 0);
       const cUpi = cTxns.filter(t => t.paymentMode === "UPI").reduce((s, t) => s + (t.totalAmount || 0), 0);
-      const cSold = (filterDate === "ALL") ? allTimeSold : cTxns.filter(t => (t.paymentMode === "CASH" || t.paymentMode === "UPI") && (t.type === "SALE" || t.type === "PREORDER_FULFILLMENT")).reduce((s, t) => s + (t.copies || 0), 0);
+      const cSold = (filterDate === "ALL") ? allTimeSold : cTxns.filter(t => t.type === "SALE" || t.type === "PREORDER_FULFILLMENT").reduce((s, t) => s + (t.copies || 0), 0);
       const cVip = (filterDate === "ALL") ? allTimeVip : cTxns.filter(t => t.paymentMode === "FREE_VIP" || t.type === "VIP").reduce((s, t) => s + (t.copies || 0), 0);
 
-      // Cash float transfers between counters
+      // Cash float transfers between counters and Stock Room
       const cashTransfersReceived = (event.transfers || [])
         .filter(t => (t.toCounterId === counter.id || t.to_counter === counter.id) && t.type === "CASH" && t.status === "ACCEPTED")
         .reduce((s, t) => s + (t.cashAmount || t.amountOrQuantity || t.amount_or_quantity || 0), 0);
@@ -1560,10 +1643,23 @@ class CounterSyncStore {
       };
     });
 
+    // 5. Stock Active in Counters (sum of accurate physical counter shelf stocks)
+    const activeCountersStock = counterBreakdown.reduce((sum, c) => sum + (c.currentStock || 0), 0);
+    
+    // In-transit stock
+    const inTransitStock = (event.dispatches || [])
+      .filter(d => d.status === "IN_TRANSIT")
+      .reduce((sum, d) => sum + (d.copies || 0), 0);
+
+    // 6. Grand Unsold Balance
+    const grandUnsoldBalance = reserveInStockRoom + activeCountersStock + inTransitStock;
+
     return {
       netPressInflow,
       totalCopiesSold,
       totalVIPCopies,
+      counterVipCopies,
+      vaultVipCopies,
       reserveInStockRoom,
       activeCountersStock,
       inTransitStock,
@@ -1575,7 +1671,8 @@ class CounterSyncStore {
       grandRevenueWithDonations: grossRevenue + totalDonations,
       fulfilledPreOrders,
       pendingPreOrders,
-      counterBreakdown
+      counterBreakdown,
+      stockRoomCash: this.getStockRoomCashBalance(eventKey)
     };
   }
 

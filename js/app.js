@@ -497,12 +497,15 @@
     el.idleSeconds.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   }
 
-  function lockWorkspace() {
+  function lockWorkspace(isRelaunch = false) {
     // Requirement 1: Never trigger lockout screen when in 'Under Review' or 'Pending Request' status
     if (!isLiveHostedWorkspace()) {
       return;
     }
     stopIdleTimer();
+    try {
+      sessionStorage.removeItem('countersync_session_unlocked');
+    } catch (e) {}
     const event = CS_Store.getEvent(state.eventKey);
     const lockoutBox = document.querySelector('.lockout-box');
     if (lockoutBox) lockoutBox.classList.remove('shake');
@@ -514,30 +517,30 @@
 
     if (state.currentView === 'owner-portal' || state.role === 'OWNER') {
       if (lockoutTitle) lockoutTitle.textContent = 'Owner Console Locked';
-      if (lockoutDesc) lockoutDesc.textContent = 'Platform Owner security lock. Enter Owner PIN to resume.';
+      if (lockoutDesc) lockoutDesc.textContent = isRelaunch ? 'Enter Owner PIN to unlock console.' : 'Platform Owner security lock. Enter Owner PIN to resume.';
       if (lockoutHint) lockoutHint.textContent = 'Authorized: safwanvgd313@gmail.com';
       if (unlockBtn) unlockBtn.textContent = 'Unlock Owner Console';
     } else if (state.currentView === 'pos' || state.role === 'POS') {
       const counter = (event && state.counterId) ? CS_Store.getCounter(state.eventKey, state.counterId) : null;
       const counterName = counter ? counter.name : 'Sales Counter';
       if (lockoutTitle) lockoutTitle.textContent = `${counterName} Locked`;
-      if (lockoutDesc) lockoutDesc.textContent = `Workspace locked. Enter ${counterName} PIN to resume.`;
+      if (lockoutDesc) lockoutDesc.textContent = isRelaunch ? `Enter ${counterName} PIN to unlock workspace.` : `Workspace locked. Enter ${counterName} PIN to resume.`;
       if (lockoutHint) lockoutHint.textContent = counter ? `Assigned to: ${counter.volunteers}` : '';
       if (unlockBtn) unlockBtn.textContent = `Unlock ${counterName}`;
     } else if (state.currentView === 'stockroom' || state.role === 'STOCKROOM') {
       if (lockoutTitle) lockoutTitle.textContent = 'Stock Room Locked';
-      if (lockoutDesc) lockoutDesc.textContent = 'Central warehouse locked. Enter Stock Room PIN to resume.';
+      if (lockoutDesc) lockoutDesc.textContent = isRelaunch ? 'Enter Stock Room PIN to unlock warehouse.' : 'Central warehouse locked. Enter Stock Room PIN to resume.';
       const keeper = (event && event.stockRoom) ? (event.stockRoom.keeperName || event.stockRoom.keeper) : 'Vikram Malhotra';
       if (lockoutHint) lockoutHint.textContent = `Keeper: ${keeper}`;
       if (unlockBtn) unlockBtn.textContent = 'Unlock Stock Room Vault';
     } else if (state.currentView === 'admin' || state.role === 'ADMIN') {
       if (lockoutTitle) lockoutTitle.textContent = 'Super Admin Portal Locked';
-      if (lockoutDesc) lockoutDesc.textContent = 'Organizer dashboard locked. Enter Super Admin PIN to resume.';
+      if (lockoutDesc) lockoutDesc.textContent = isRelaunch ? 'Enter Super Admin PIN to unlock dashboard.' : 'Organizer dashboard locked. Enter Super Admin PIN to resume.';
       if (lockoutHint) lockoutHint.textContent = 'Organizer Master Access';
       if (unlockBtn) unlockBtn.textContent = 'Unlock Super Admin Portal';
     } else {
       if (lockoutTitle) lockoutTitle.textContent = 'Workspace Locked';
-      if (lockoutDesc) lockoutDesc.textContent = 'Workspace paused due to inactivity. Enter your assigned PIN.';
+      if (lockoutDesc) lockoutDesc.textContent = isRelaunch ? 'Enter assigned PIN to unlock.' : 'Workspace paused due to inactivity. Enter your assigned PIN.';
       if (lockoutHint) lockoutHint.textContent = '';
       if (unlockBtn) unlockBtn.textContent = 'Unlock Workspace Desk';
     }
@@ -547,7 +550,11 @@
     el.inputUnlockPin.value = '';
     setTimeout(() => el.inputUnlockPin.focus(), 60);
     CS_Audio.alertWarning();
-    showToast('Workspace locked due to inactivity', 'error');
+    if (isRelaunch) {
+      showToast('App secured. Enter PIN to unlock dashboard.', 'info');
+    } else {
+      showToast('Workspace locked due to inactivity', 'error');
+    }
   }
 
   function unlockWorkspace() {
@@ -588,6 +595,10 @@
     }
 
     if (valid) {
+      try {
+        sessionStorage.setItem('countersync_session_unlocked', 'true');
+        localStorage.removeItem('countersync_app_closed_lock');
+      } catch (e) {}
       el.lockoutScreen.classList.add('hidden');
       el.lockoutScreen.classList.remove('active');
       startIdleTimer();
@@ -1577,6 +1588,26 @@
       });
     }
 
+    // Deposit Collection to Stockroom (End of Day Tab)
+    const btnOpenDepositStockroom = document.getElementById('btn-open-deposit-stockroom');
+    if (btnOpenDepositStockroom) {
+      btnOpenDepositStockroom.addEventListener('click', openDepositStockroomModal);
+    }
+    const btnDepositAllCash = document.getElementById('btn-deposit-all-cash');
+    if (btnDepositAllCash) {
+      btnDepositAllCash.addEventListener('click', () => {
+        const metrics = CS_Store.getBalancedLedgerMetrics(state.eventKey, 'ALL');
+        const brk = metrics ? (metrics.counterBreakdown || []).find(b => b.id === state.counterId) : null;
+        const cash = brk ? brk.cashCollection : 0;
+        const amtInput = document.getElementById('deposit-stockroom-amount');
+        if (amtInput) amtInput.value = cash;
+      });
+    }
+    const btnConfirmDeposit = document.getElementById('btn-confirm-deposit-stockroom');
+    if (btnConfirmDeposit) {
+      btnConfirmDeposit.addEventListener('click', handleConfirmDepositStockroom);
+    }
+
     // Save Backup JSON in End of Day (Section 2 & 3)
     const btnBackup = document.getElementById('btn-export-counter-json');
     if (btnBackup) {
@@ -1942,6 +1973,79 @@
       if (modal) modal.classList.add('hidden');
       if (inputQty) inputQty.value = '';
       if (inputNotes) inputNotes.value = '';
+      renderPOSWorkspace();
+    } catch (err) {
+      CS_Audio.alertWarning();
+      showToast(err.message, 'error');
+    }
+  }
+
+  // End of Day Collection Deposit to Stock Room Handlers
+  function openDepositStockroomModal() {
+    const modal = document.getElementById('modal-deposit-stockroom');
+    const counter = CS_Store.getCounter(state.eventKey, state.counterId);
+    if (!modal || !counter) return;
+
+    const metrics = CS_Store.getBalancedLedgerMetrics(state.eventKey, 'ALL');
+    const brk = metrics ? (metrics.counterBreakdown || []).find(b => b.id === counter.id) : null;
+    const availableCash = brk ? brk.cashCollection : 0;
+
+    const valEl = document.getElementById('deposit-avail-cash-val');
+    if (valEl) valEl.textContent = `₹${availableCash.toLocaleString('en-IN')}`;
+
+    const amtInput = document.getElementById('deposit-stockroom-amount');
+    if (amtInput) amtInput.value = availableCash > 0 ? availableCash : '';
+
+    const staffInput = document.getElementById('deposit-stockroom-staff');
+    if (staffInput) staffInput.value = counter.volunteers ? counter.volunteers.split(',')[0].trim() : 'Counter Staff';
+
+    const notesInput = document.getElementById('deposit-stockroom-notes');
+    if (notesInput) notesInput.value = 'End of day cash collection deposit';
+
+    modal.classList.remove('hidden');
+    if (amtInput) setTimeout(() => amtInput.focus(), 60);
+  }
+
+  function handleConfirmDepositStockroom() {
+    const amtInput = document.getElementById('deposit-stockroom-amount');
+    const staffInput = document.getElementById('deposit-stockroom-staff');
+    const notesInput = document.getElementById('deposit-stockroom-notes');
+    const modal = document.getElementById('modal-deposit-stockroom');
+
+    const amount = parseInt(amtInput ? amtInput.value : 0, 10);
+    const staff = staffInput ? staffInput.value.trim() : 'Counter Staff';
+    const notes = notesInput ? notesInput.value.trim() : 'End of day cash collection deposit';
+
+    if (isNaN(amount) || amount <= 0) {
+      showToast('Please enter a valid deposit amount (> 0)', 'error');
+      if (amtInput) amtInput.focus();
+      return;
+    }
+
+    const metrics = CS_Store.getBalancedLedgerMetrics(state.eventKey, 'ALL');
+    const brk = metrics ? (metrics.counterBreakdown || []).find(b => b.id === state.counterId) : null;
+    const availableCash = brk ? brk.cashCollection : 0;
+
+    if (amount > availableCash) {
+      showToast(`Cannot deposit ₹${amount}! Available cash drawer balance is ₹${availableCash}.`, 'error');
+      if (amtInput) amtInput.focus();
+      return;
+    }
+
+    try {
+      CS_Store.initiateInterCounterTransfer({
+        eventKey: state.eventKey,
+        fromCounterId: state.counterId,
+        toCounterId: 'stockroom',
+        type: 'CASH',
+        amountOrQuantity: amount,
+        notes,
+        authorizedBy: staff
+      });
+
+      if (modal) modal.classList.add('hidden');
+      CS_Audio.handshakeSuccess();
+      showToast(`₹${amount.toLocaleString('en-IN')} cash collection sent to Central Stockroom! Pending acceptance.`, 'success');
       renderPOSWorkspace();
     } catch (err) {
       CS_Audio.alertWarning();
@@ -2838,6 +2942,47 @@
         }
       });
     }
+
+    // 3.6 Submit Cash Float Transfer to Counter
+    const btnSubmitCashTransfer = document.getElementById('btn-submit-sr-cash-transfer');
+    if (btnSubmitCashTransfer) {
+      btnSubmitCashTransfer.addEventListener('click', () => {
+        const targetSelect = document.getElementById('sr-cash-target-counter');
+        const toCounterId = targetSelect ? targetSelect.value : '';
+        const amtInput = document.getElementById('sr-cash-transfer-amount');
+        const notesInput = document.getElementById('sr-cash-transfer-notes');
+        const amount = parseInt(amtInput ? amtInput.value : 0, 10);
+        const notes = notesInput ? notesInput.value.trim() : 'Opening cash float';
+
+        if (!toCounterId) {
+          showToast('Select destination counter for cash transfer', 'error');
+          return;
+        }
+        if (isNaN(amount) || amount <= 0) {
+          showToast('Enter a valid transfer amount (> 0)', 'error');
+          return;
+        }
+
+        try {
+          CS_Store.initiateInterCounterTransfer({
+            eventKey: state.eventKey,
+            fromCounterId: 'stockroom',
+            toCounterId,
+            type: 'CASH',
+            amountOrQuantity: amount,
+            notes,
+            authorizedBy: 'Stock Room Keeper'
+          });
+          CS_Audio.handshakeSuccess();
+          showToast(`Disbursed ₹${amount} cash float! Awaiting counter handshake.`, 'success');
+          if (amtInput) amtInput.value = '1000';
+          renderStockRoomWorkspace();
+        } catch (err) {
+          CS_Audio.alertWarning();
+          showToast(err.message, 'error');
+        }
+      });
+    }
   }
 
   function renderStockRoomWorkspace() {
@@ -2861,13 +3006,32 @@
       select.appendChild(opt);
     });
 
+    // Populate cash target counter select
+    const cashTargetSelect = document.getElementById('sr-cash-target-counter');
+    if (cashTargetSelect) {
+      cashTargetSelect.innerHTML = '';
+      (event.counters || []).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = `${c.name} (${c.volunteers || 'Staff'})`;
+        cashTargetSelect.appendChild(opt);
+      });
+    }
+
     // Compute Metrics
     const metrics = CS_Store.getBalancedLedgerMetrics(state.eventKey, 'ALL');
 
     document.getElementById('sr-kpi-inflow').textContent = metrics.netPressInflow.toLocaleString('en-IN');
     document.getElementById('sr-kpi-reserve').textContent = metrics.reserveInStockRoom.toLocaleString('en-IN');
-    document.getElementById('sr-kpi-distributed').textContent = (metrics.activeCountersStock + metrics.totalCopiesSold).toLocaleString('en-IN');
+    const totalDistributed = metrics.activeCountersStock + metrics.totalCopiesSold + (metrics.counterVipCopies || 0) + (metrics.inTransitStock || 0);
+    document.getElementById('sr-kpi-distributed').textContent = totalDistributed.toLocaleString('en-IN');
     document.getElementById('sr-kpi-giveaway').textContent = metrics.totalVIPCopies.toLocaleString('en-IN');
+
+    // Stock Room Cash Vault KPI
+    const srCashVaultEl = document.getElementById('sr-kpi-cash-vault');
+    if (srCashVaultEl) srCashVaultEl.textContent = `₹${(metrics.stockRoomCash || 0).toLocaleString('en-IN')}`;
+    const srTotalVaultCashEl = document.getElementById('sr-total-vault-cash');
+    if (srTotalVaultCashEl) srTotalVaultCashEl.textContent = `₹${(metrics.stockRoomCash || 0).toLocaleString('en-IN')}`;
 
     // 3.2 Individual Counters Live Stock Status Monitor
     const counters = event.counters || [];
@@ -3015,6 +3179,111 @@
         });
         lowStockTbody.appendChild(tr);
       });
+    }
+
+    // Counter Cash Deposits & Float Transfers Table
+    const stockroomTransfers = CS_Store.getAllTransfersForStockRoom(state.eventKey) || [];
+    const pendingStockroomCash = stockroomTransfers.filter(t => (t.toCounterId === 'stockroom' || t.to_counter === 'stockroom') && t.status === 'PENDING').length;
+    const srPendingCashPill = document.getElementById('sr-pending-cash-count');
+    if (srPendingCashPill) {
+      srPendingCashPill.textContent = `${pendingStockroomCash} Pending`;
+      srPendingCashPill.style.background = pendingStockroomCash > 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)';
+      srPendingCashPill.style.color = pendingStockroomCash > 0 ? '#EF4444' : '#10B981';
+    }
+
+    const cashTbody = document.getElementById('sr-cash-transfers-tbody');
+    if (cashTbody) {
+      cashTbody.innerHTML = '';
+      if (stockroomTransfers.length === 0) {
+        cashTbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color: var(--text-muted); padding: 18px;">No cash collection deposits or float transfers recorded yet.</td></tr>`;
+      } else {
+        stockroomTransfers.forEach(t => {
+          const isDeposit = (t.toCounterId === 'stockroom' || t.to_counter === 'stockroom');
+          const counterName = isDeposit ? (t.fromCounterName || t.fromCounterId) : (t.toCounterName || t.toCounterId);
+          const tr = document.createElement('tr');
+          const isPending = t.status === 'PENDING';
+          const isAccepted = t.status === 'ACCEPTED';
+          const isRejected = t.status === 'REJECTED';
+
+          let statusColor = isAccepted ? '#10B981' : (isRejected ? '#EF4444' : '#F59E0B');
+
+          let actionCell = '<span style="color: var(--text-muted); font-size: 0.8rem;">Completed</span>';
+          if (isDeposit && isPending) {
+            actionCell = `
+              <div style="display: flex; gap: 6px;">
+                <button type="button" class="btn-pill sr-btn-accept-cash" data-tid="${t.id || t.transfer_id}" style="background: rgba(16, 185, 129, 0.2); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.4); font-size: 0.76rem; font-weight: 700; padding: 4px 10px; cursor: pointer;">
+                  ✓ Accept
+                </button>
+                <button type="button" class="btn-pill sr-btn-reject-cash" data-tid="${t.id || t.transfer_id}" style="background: rgba(239, 68, 68, 0.15); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 0.76rem; font-weight: 700; padding: 4px 8px; cursor: pointer;">
+                  ✕ Reject
+                </button>
+              </div>
+            `;
+          } else if (!isDeposit && isPending) {
+            actionCell = '<em style="color: var(--text-muted); font-size: 0.78rem;">Awaiting Counter</em>';
+          }
+
+          tr.innerHTML = `
+            <td><strong>${t.id || t.transfer_id}</strong></td>
+            <td>
+              <span style="font-weight: 700; color: ${isDeposit ? '#10B981' : '#0066FF'};">
+                ${isDeposit ? '📥 Counter Deposit' : '📤 Float Outflow'}
+              </span>
+            </td>
+            <td><strong>${counterName}</strong></td>
+            <td><strong style="color: ${isDeposit ? '#10B981' : '#0066FF'}; font-size: 1.05rem;">₹${(t.cashAmount || t.amountOrQuantity || 0).toLocaleString('en-IN')}</strong></td>
+            <td>${new Date(t.timestamp || t.initiated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+            <td><span class="stock-pill" style="color: ${statusColor}; border-color: ${statusColor}; font-size: 0.74rem;">${t.status}</span></td>
+            <td>
+              <span style="font-size: 0.82rem;">${t.notes || 'Cash transfer'}</span><br>
+              <span style="font-size: 0.72rem; color: var(--text-muted);">By: ${t.authorizedBy || 'Staff'}</span>
+            </td>
+            <td>${actionCell}</td>
+          `;
+
+          const btnAccept = tr.querySelector('.sr-btn-accept-cash');
+          if (btnAccept) {
+            btnAccept.addEventListener('click', () => {
+              try {
+                CS_Store.respondInterCounterTransfer({
+                  eventKey: state.eventKey,
+                  transferId: t.id || t.transfer_id,
+                  action: 'ACCEPT',
+                  responderName: 'Stock Room Keeper'
+                });
+                CS_Audio.handshakeSuccess();
+                showToast(`Accepted ₹${t.cashAmount || t.amountOrQuantity} cash deposit into Central Vault!`, 'success');
+                renderStockRoomWorkspace();
+              } catch (e) {
+                CS_Audio.alertWarning();
+                showToast(e.message, 'error');
+              }
+            });
+          }
+
+          const btnReject = tr.querySelector('.sr-btn-reject-cash');
+          if (btnReject) {
+            btnReject.addEventListener('click', () => {
+              try {
+                CS_Store.respondInterCounterTransfer({
+                  eventKey: state.eventKey,
+                  transferId: t.id || t.transfer_id,
+                  action: 'REJECT',
+                  responderName: 'Stock Room Keeper'
+                });
+                CS_Audio.playTone(300, 'square', 0.15);
+                showToast(`Rejected deposit of ₹${t.cashAmount || t.amountOrQuantity}. Returned to ${counterName}.`, 'info');
+                renderStockRoomWorkspace();
+              } catch (e) {
+                CS_Audio.alertWarning();
+                showToast(e.message, 'error');
+              }
+            });
+          }
+
+          cashTbody.appendChild(tr);
+        });
+      }
     }
   }
 
@@ -4304,7 +4573,23 @@
 
       if (!hasResumedSession) {
         navigateTo('landing');
+      } else {
+        // Auto-lock feature: app automatically locks if it was closed, staff enters dashboard by unlocking with PIN
+        const isAppReopened = !sessionStorage.getItem('countersync_session_unlocked') || localStorage.getItem('countersync_app_closed_lock') === 'true';
+        if (isAppReopened && isLiveHostedWorkspace()) {
+          lockWorkspace(true);
+        } else {
+          try { sessionStorage.setItem('countersync_session_unlocked', 'true'); } catch (e) {}
+        }
       }
+
+      // Automatically register app close / tab close for security auto-lock on next launch
+      window.addEventListener('pagehide', () => {
+        try { localStorage.setItem('countersync_app_closed_lock', 'true'); } catch (e) {}
+      });
+      window.addEventListener('beforeunload', () => {
+        try { localStorage.setItem('countersync_app_closed_lock', 'true'); } catch (e) {}
+      });
 
       // Check URL hash (#owner)
       checkUrlHashOwner();
