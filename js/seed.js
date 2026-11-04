@@ -462,22 +462,6 @@ const CS_DEFAULT_SEED = {
         requestedAt: "2026-10-30T00:00:00.000Z",
         approvedAt: "2026-10-30T00:00:00.000Z",
         notes: "Master flagship exhibition event"
-      },
-      {
-        id: "RENT-REQ-101",
-        hostEmail: "rahul.organizer@keralalitfest.org",
-        hostName: "Rahul Menon",
-        organization: "Kerala Literature Festival Foundation",
-        phone: "+91 94471 23456",
-        eventKey: "KLF2026",
-        eventName: "Kerala Lit Fest 2026",
-        status: "PENDING",
-        allowedCounters: 4,
-        startsAt: "2026-11-10T00:00:00.000Z",
-        expiresAt: "2026-11-15T23:59:59.000Z",
-        requestedAt: "2026-11-03T10:30:00.000Z",
-        approvedAt: null,
-        notes: "Beach pavilion festival book counters"
       }
     ]
   }

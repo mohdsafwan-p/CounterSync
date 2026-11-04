@@ -286,18 +286,83 @@
       }
     },
 
+    /**
+     * Listen in real-time to all hosted events across the platform.
+     * Streams all active events to the Owner Portal so running events are listed dynamically.
+     */
+    listenToAllEvents(onUpdateCallback) {
+      if (!isInitialized || !db || isDummyConfig) {
+        return () => {};
+      }
+      try {
+        return db.collection('events').onSnapshot(
+          (snapshot) => {
+            const eventsMap = {};
+            snapshot.forEach(doc => {
+              if (doc.exists) {
+                eventsMap[doc.id] = doc.data();
+              }
+            });
+            if (typeof onUpdateCallback === 'function') {
+              onUpdateCallback(eventsMap);
+            }
+          },
+          (error) => {
+            console.warn("[CounterSync Firebase] All events real-time listener notice:", error.message);
+          }
+        );
+      } catch (err) {
+        console.error("[CounterSync Firebase] Error attaching all events listener:", err);
+        return () => {};
+      }
+    },
+
     // --- SaaS Platform Rentals Synchronization ---
+    async syncRentalRecordToCloud(rental) {
+      if (!isInitialized || !db || isDummyConfig || !rental) return false;
+      try {
+        const id = rental.id || ('RENT-' + (rental.eventKey || Date.now()));
+        const cleanRental = JSON.parse(JSON.stringify(rental));
+        await db.collection('rentals').doc(id).set(cleanRental, { merge: true });
+        return true;
+      } catch (err) {
+        console.warn("[CounterSync Firebase] Single rental sync notice:", err.message);
+        return false;
+      }
+    },
+
+    async deleteRentalFromCloud(rentalId) {
+      if (!isInitialized || !db || isDummyConfig || !rentalId) return false;
+      try {
+        await db.collection('rentals').doc(rentalId).delete();
+        return true;
+      } catch (err) {
+        console.warn("[CounterSync Firebase] Delete rental notice:", err.message);
+        return false;
+      }
+    },
+
     async syncRentalsToCloud(rentals) {
       if (!isInitialized || !db || isDummyConfig || !rentals) {
         return false;
       }
       try {
+        // 1. Sync registry document
         const docRef = db.collection('platform').doc('rentals_registry');
         await docRef.set({
           rentals: JSON.parse(JSON.stringify(rentals)),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
           lastUpdatedISO: new Date().toISOString()
         }, { merge: true });
+
+        // 2. Also ensure each rental exists in the individual 'rentals' collection to prevent overwrite race conditions
+        if (Array.isArray(rentals)) {
+          rentals.forEach(r => {
+            if (r && r.id) {
+              db.collection('rentals').doc(r.id).set(JSON.parse(JSON.stringify(r)), { merge: true }).catch(() => {});
+            }
+          });
+        }
         return true;
       } catch (err) {
         console.warn("[CounterSync Firebase] Rentals sync notice:", err.message);
@@ -310,16 +375,38 @@
         return () => {};
       }
       try {
-        const docRef = db.collection('platform').doc('rentals_registry');
-        return docRef.onSnapshot((snap) => {
-          if (snap.exists) {
-            const data = snap.data();
-            if (data && data.rentals && typeof onUpdateCallback === 'function') {
-              onUpdateCallback(data.rentals);
+        // Real-time listener for the dedicated 'rentals' collection (multi-tenant safe)
+        return db.collection('rentals').onSnapshot((snapshot) => {
+          const cloudRentals = [];
+          snapshot.forEach(doc => {
+            if (doc.exists) {
+              cloudRentals.push(doc.data());
             }
+          });
+
+          if (cloudRentals.length > 0) {
+            if (typeof onUpdateCallback === 'function') {
+              onUpdateCallback(cloudRentals);
+            }
+          } else {
+            // Fallback check on legacy platform/rentals_registry
+            db.collection('platform').doc('rentals_registry').get().then(snap => {
+              if (snap.exists && snap.data().rentals) {
+                if (typeof onUpdateCallback === 'function') {
+                  onUpdateCallback(snap.data().rentals);
+                }
+              }
+            }).catch(() => {});
           }
         }, (err) => {
-          console.warn("[CounterSync Firebase] Rentals listener notice:", err.message);
+          console.warn("[CounterSync Firebase] Rentals collection listener notice, falling back to registry doc:", err.message);
+          db.collection('platform').doc('rentals_registry').onSnapshot(snap => {
+            if (snap.exists && snap.data().rentals && typeof onUpdateCallback === 'function') {
+              onUpdateCallback(snap.data().rentals);
+            }
+          }, (err2) => {
+            console.warn("[CounterSync Firebase] Rentals registry doc notice:", err2.message);
+          });
         });
       } catch (err) {
         console.error("[CounterSync Firebase] Error listening to rentals:", err);

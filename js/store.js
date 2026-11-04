@@ -132,6 +132,45 @@ class CounterSyncStore {
     this.initRentalsCloudSync();
   }
 
+  initOwnerCloudSync() {
+    if (typeof window === 'undefined' || !window.CS_Firebase) return;
+
+    // 1. Listen to real-time updates for all hosted running events across the platform
+    if (typeof window.CS_Firebase.listenToAllEvents === 'function') {
+      window.CS_Firebase.listenToAllEvents((cloudEventsMap) => {
+        if (!cloudEventsMap) return;
+        this.updateAllEventsFromCloud(cloudEventsMap);
+        this._notifySubscribers('EVENTS_ALL_SYNC', cloudEventsMap);
+      });
+    }
+
+    // 2. Listen to real-time updates for all rental applications
+    this.initRentalsCloudSync();
+  }
+
+  updateAllEventsFromCloud(cloudEventsMap) {
+    try {
+      const data = this.getData();
+      if (!data.events) data.events = {};
+      let changed = false;
+      Object.keys(cloudEventsMap).forEach(key => {
+        const cleanKey = key.toUpperCase().trim();
+        const localEv = data.events[cleanKey];
+        data.events[cleanKey] = {
+          ...(localEv || {}),
+          ...cloudEventsMap[key]
+        };
+        changed = true;
+      });
+      if (changed) {
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+        this._broadcast('SYNC', { timestamp: Date.now(), source: 'EVENTS_ALL_CLOUD' });
+      }
+    } catch (e) {
+      console.error("[CounterSync Store] Error merging all cloud events:", e);
+    }
+  }
+
   initRentalsCloudSync() {
     if (typeof window === 'undefined' || !window.CS_Firebase) return;
     window.CS_Firebase.listenToRentals((cloudRentals) => {
@@ -145,7 +184,12 @@ class CounterSyncStore {
     try {
       const data = this.getData();
       if (!data.platform) data.platform = {};
-      data.platform.rentals = cloudRentals;
+      // Filter out any obsolete mock emails from seed data
+      const cleanList = (cloudRentals || []).filter(r => 
+        r.hostEmail !== 'rahul.organizer@keralalitfest.org' && 
+        r.hostEmail !== 'ananya.fest@bangalorelit.in'
+      );
+      data.platform.rentals = cleanList;
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
       this._broadcast('SYNC', { timestamp: Date.now(), source: 'RENTALS_CLOUD' });
     } catch (e) {
@@ -169,6 +213,11 @@ class CounterSyncStore {
         return [];
       }
     }
+    // Filter out any obsolete mock emails
+    data.platform.rentals = (data.platform.rentals || []).filter(r => 
+      r.hostEmail !== 'rahul.organizer@keralalitfest.org' && 
+      r.hostEmail !== 'ananya.fest@bangalorelit.in'
+    );
     return data.platform.rentals || [];
   }
 
@@ -287,6 +336,11 @@ class CounterSyncStore {
     }
 
     this.saveData(data);
+    if (typeof window !== 'undefined' && window.CS_Firebase && window.CS_Firebase.isReady) {
+      if (typeof window.CS_Firebase.syncRentalRecordToCloud === 'function') {
+        window.CS_Firebase.syncRentalRecordToCloud(rentalRecord);
+      }
+    }
     return rentalRecord;
   }
 
@@ -342,6 +396,14 @@ class CounterSyncStore {
     }
 
     this.saveData(data);
+    if (typeof window !== 'undefined' && window.CS_Firebase && window.CS_Firebase.isReady) {
+      if (typeof window.CS_Firebase.syncRentalRecordToCloud === 'function') {
+        window.CS_Firebase.syncRentalRecordToCloud(rental);
+      }
+      if (data.events[key] && typeof window.CS_Firebase.syncEventToCloud === 'function') {
+        window.CS_Firebase.syncEventToCloud(key, data.events[key]);
+      }
+    }
     return rental;
   }
 
@@ -355,6 +417,11 @@ class CounterSyncStore {
     rental.deniedReason = reason;
     rental.deniedAt = new Date().toISOString();
     this.saveData(data);
+    if (typeof window !== 'undefined' && window.CS_Firebase && window.CS_Firebase.isReady) {
+      if (typeof window.CS_Firebase.syncRentalRecordToCloud === 'function') {
+        window.CS_Firebase.syncRentalRecordToCloud(rental);
+      }
+    }
     return rental;
   }
 
@@ -368,6 +435,11 @@ class CounterSyncStore {
     rental.suspendedReason = reason;
     rental.suspendedAt = new Date().toISOString();
     this.saveData(data);
+    if (typeof window !== 'undefined' && window.CS_Firebase && window.CS_Firebase.isReady) {
+      if (typeof window.CS_Firebase.syncRentalRecordToCloud === 'function') {
+        window.CS_Firebase.syncRentalRecordToCloud(rental);
+      }
+    }
     return rental;
   }
 
@@ -380,6 +452,11 @@ class CounterSyncStore {
     rental.expiresAt = newExpiresAt;
     rental.status = 'ACTIVE';
     this.saveData(data);
+    if (typeof window !== 'undefined' && window.CS_Firebase && window.CS_Firebase.isReady) {
+      if (typeof window.CS_Firebase.syncRentalRecordToCloud === 'function') {
+        window.CS_Firebase.syncRentalRecordToCloud(rental);
+      }
+    }
     return rental;
   }
 
@@ -1080,8 +1157,11 @@ class CounterSyncStore {
     // 1. Delete from local events
     delete data.events[cleanKey];
 
-    // 2. Remove from platform rental registry
+    // 2. Remove from platform rental registry and find linked rental ID
+    let linkedRentalId = null;
     if (data.platform && data.platform.rentals) {
+      const rental = data.platform.rentals.find(r => (r.eventKey || '').toUpperCase() === cleanKey);
+      if (rental) linkedRentalId = rental.id;
       data.platform.rentals = data.platform.rentals.filter(r => (r.eventKey || '').toUpperCase() !== cleanKey);
     }
 
@@ -1094,11 +1174,16 @@ class CounterSyncStore {
     this.saveData(data);
 
     // 4. Purge from cloud Firestore if connected
-    if (typeof window !== 'undefined' && window.CS_Firebase && window.CS_Firebase.db) {
+    if (typeof window !== 'undefined' && window.CS_Firebase) {
       try {
-        window.CS_Firebase.db.collection('events').doc(cleanKey).delete().catch(e => {
-          console.warn("[CounterSync Firebase] Purge document notice:", e);
-        });
+        if (typeof window.CS_Firebase.deleteEventFromCloud === 'function') {
+          window.CS_Firebase.deleteEventFromCloud(cleanKey).catch(() => {});
+        } else if (window.CS_Firebase.db) {
+          window.CS_Firebase.db.collection('events').doc(cleanKey).delete().catch(() => {});
+        }
+        if (linkedRentalId && typeof window.CS_Firebase.deleteRentalFromCloud === 'function') {
+          window.CS_Firebase.deleteRentalFromCloud(linkedRentalId).catch(() => {});
+        }
       } catch (e) {}
     }
 

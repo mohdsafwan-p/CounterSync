@@ -311,6 +311,26 @@
     }
   }
 
+  // Helper: check if active workspace is an approved live/hosted workspace
+  function isLiveHostedWorkspace() {
+    if (state.currentView === 'landing' || state.currentView === 'host-request' || state.currentView === 'rental-status') {
+      return false;
+    }
+    if (state.currentView === 'pos' || state.currentView === 'stockroom' || state.currentView === 'owner-portal') {
+      return true;
+    }
+    if (state.currentView === 'admin') {
+      if (state.eventKey) {
+        const license = CS_Store.isEventLicenseValid(state.eventKey);
+        if (license && (license.status === 'PENDING' || license.status === 'UNDER_REVIEW')) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
   // --- View Switcher ---
   function navigateTo(viewName) {
     // Strict Platform Owner Portal Security Guard
@@ -331,13 +351,21 @@
 
     state.currentView = viewName;
 
+    // Requirement 1: Remove screen lock timer when in 'Under Review' or 'Pending Request' status;
+    // activate timer logic ONLY after event has been approved and is live/hosted.
+    const isLiveHosted = isLiveHostedWorkspace();
+
     // Header auto-hiding behavior: Hidden on gateway landing screen
     if (viewName === 'landing') {
       el.appHeader.classList.add('hidden');
       stopIdleTimer();
     } else {
       el.appHeader.classList.remove('hidden');
-      startIdleTimer();
+      if (isLiveHosted) {
+        startIdleTimer();
+      } else {
+        stopIdleTimer();
+      }
       if (state.eventKey) {
         CS_Store.initCloudSync(state.eventKey);
       }
@@ -353,10 +381,12 @@
     if (el.viewHostRequest) el.viewHostRequest.classList.toggle('hidden', viewName !== 'host-request');
     if (el.viewRentalStatus) el.viewRentalStatus.classList.toggle('hidden', viewName !== 'rental-status');
 
-    // Quick lock visibility
+    // Quick lock & timer visibility: ONLY show when live/hosted event is active
     const isOwnerTimerDisabled = (viewName === 'owner-portal' && CS_Store.getOwnerLockTimer && CS_Store.getOwnerLockTimer() === 0);
-    el.btnQuickLock.classList.toggle('hidden', viewName === 'landing');
-    el.idleTimerDisplay.classList.toggle('hidden', viewName === 'landing' || isOwnerTimerDisabled);
+    const showLockControls = isLiveHosted && !isOwnerTimerDisabled;
+
+    el.btnQuickLock.classList.toggle('hidden', !showLockControls);
+    el.idleTimerDisplay.classList.toggle('hidden', !showLockControls);
 
     // Update context badge
     const event = CS_Store.getEvent(state.eventKey);
@@ -378,6 +408,9 @@
     } else if (viewName === 'owner-portal') {
       el.headerEventLabel.textContent = 'Platform Owner • Master SaaS Console';
       if (el.headerStaffPill) el.headerStaffPill.textContent = 'Owner';
+      if (typeof CS_Store.initOwnerCloudSync === 'function') {
+        CS_Store.initOwnerCloudSync();
+      }
       renderOwnerPortal();
     } else if (viewName === 'host-request') {
       el.headerEventLabel.textContent = 'Event Rental Request';
@@ -411,6 +444,11 @@
   // --- Inactivity Auto-Lock (Configurable Idle Timer) ---
   function startIdleTimer() {
     stopIdleTimer();
+    // Requirement 1: Only activate timer after event has been approved and is live/hosted
+    if (!isLiveHostedWorkspace()) {
+      return;
+    }
+
     let duration = 180; // 3 minutes default
     if (state.currentView === 'owner-portal' || state.role === 'OWNER') {
       duration = CS_Store.getOwnerLockTimer ? CS_Store.getOwnerLockTimer() : 180;
@@ -440,15 +478,17 @@
   }
 
   function resetIdleActivity() {
-    if (state.currentView !== 'landing' && !el.lockoutScreen.classList.contains('active')) {
-      let duration = 180;
-      if (state.currentView === 'owner-portal' || state.role === 'OWNER') {
-        duration = CS_Store.getOwnerLockTimer ? CS_Store.getOwnerLockTimer() : 180;
-        if (duration === 0) return;
-      }
-      state.idleSecondsRemaining = duration;
-      updateIdleDisplay();
+    // Requirement 1: Do not reset or track idle activity when in 'Under Review' or 'Pending Request'
+    if (!isLiveHostedWorkspace() || el.lockoutScreen.classList.contains('active')) {
+      return;
     }
+    let duration = 180;
+    if (state.currentView === 'owner-portal' || state.role === 'OWNER') {
+      duration = CS_Store.getOwnerLockTimer ? CS_Store.getOwnerLockTimer() : 180;
+      if (duration === 0) return;
+    }
+    state.idleSecondsRemaining = duration;
+    updateIdleDisplay();
   }
 
   function updateIdleDisplay() {
@@ -458,6 +498,10 @@
   }
 
   function lockWorkspace() {
+    // Requirement 1: Never trigger lockout screen when in 'Under Review' or 'Pending Request' status
+    if (!isLiveHostedWorkspace()) {
+      return;
+    }
     stopIdleTimer();
     const event = CS_Store.getEvent(state.eventKey);
     const lockoutBox = document.querySelector('.lockout-box');
@@ -3338,8 +3382,15 @@
     const data = CS_Store.getData();
 
     // 1. KPI Aggregation (Requirement 5: Active Events Counter & Pending Applications only)
-    const pendingCount = rentals.filter(r => r.status === 'PENDING').length;
-    const activeCount = Object.keys(data.events || {}).length;
+    const pendingRentals = rentals.filter(r => r.status === 'PENDING');
+    const pendingCount = pendingRentals.length;
+
+    // Determine all active hosted running events across cloud & local data
+    const activeRentals = rentals.filter(r => r.status === 'ACTIVE');
+    const localEventKeys = Object.keys(data.events || {});
+    const rentalEventKeys = activeRentals.map(r => (r.eventKey || '').toUpperCase().trim()).filter(Boolean);
+    const allRunningKeys = Array.from(new Set([...localEventKeys, ...rentalEventKeys])).filter(k => k.length > 0);
+    const activeCount = allRunningKeys.length;
 
     const elPending = document.getElementById('owner-kpi-pending');
     const elActive = document.getElementById('owner-kpi-active');
@@ -3351,13 +3402,24 @@
     if (elInboxCounter) elInboxCounter.textContent = pendingCount;
     if (elEventsCounter) elEventsCounter.textContent = activeCount;
 
-    // 2. Render Inbox (Applications)
+    // 2. Render Host Approval Queue (Applications awaiting review)
     const listEl = document.getElementById('owner-rental-requests-list');
     if (listEl) {
       if (rentals.length === 0) {
-        listEl.innerHTML = `<div style="text-align: center; padding: 32px; color: var(--text-muted);">No rental applications yet.</div>`;
+        listEl.innerHTML = `<div style="text-align: center; padding: 36px 20px; color: var(--text-muted); font-size: 0.95rem;">
+          <div style="font-size: 2rem; margin-bottom: 8px;">📬</div>
+          <strong>No rental applications in queue</strong>
+          <div style="font-size: 0.82rem; margin-top: 4px;">Incoming event host applications will automatically appear here in real time.</div>
+        </div>`;
       } else {
-        listEl.innerHTML = rentals.map(r => {
+        // Prioritize PENDING requests at top of queue
+        const sortedRentals = [...rentals].sort((a, b) => {
+          if (a.status === 'PENDING' && b.status !== 'PENDING') return -1;
+          if (a.status !== 'PENDING' && b.status === 'PENDING') return 1;
+          return new Date(b.requestedAt || 0) - new Date(a.requestedAt || 0);
+        });
+
+        listEl.innerHTML = sortedRentals.map(r => {
           const statusClass = (r.status || 'pending').toLowerCase();
           const isPending = r.status === 'PENDING';
           const isActive = r.status === 'ACTIVE';
@@ -3365,7 +3427,7 @@
           const expiryText = r.expiresAt ? new Date(r.expiresAt).toLocaleDateString() : 'None';
 
           return `
-            <div class="rental-item-card">
+            <div class="rental-item-card" style="${isPending ? 'border-left: 4px solid #F59E0B;' : ''}">
               <div class="rental-card-header">
                 <div>
                   <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
@@ -3406,10 +3468,10 @@
 
               <div class="rental-actions-row">
                 ${isPending ? `
-                  <button class="btn-pill btn-pill-primary" onclick="window.openRentalApprovalModal('${r.id}')" style="font-size: 0.80rem; padding: 6px 14px;">
+                  <button class="btn-pill btn-pill-primary" onclick="window.openRentalApprovalModal('${r.id}')" style="font-size: 0.82rem; padding: 7px 16px;">
                     👑 Approve & Grant Access
                   </button>
-                  <button class="btn-pill" style="font-size: 0.80rem; padding: 6px 14px; background: rgba(239, 68, 68, 0.12); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.3);" onclick="window.handleDenyRental('${r.id}')">
+                  <button class="btn-pill" style="font-size: 0.82rem; padding: 7px 14px; background: rgba(239, 68, 68, 0.12); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.3);" onclick="window.handleDenyRental('${r.id}')">
                     ⛔ Reject Request
                   </button>
                 ` : ''}
@@ -3418,7 +3480,7 @@
                   <button class="btn-pill btn-pill-subtle" onclick="window.handleExtendRentalPrompt('${r.id}')" style="font-size: 0.80rem; padding: 6px 12px;">
                     ⏱️ Extend Expiry
                   </button>
-                  <button class="btn-pill" style="font-size: 0.80rem; padding: 6px 12px; background: rgba(239, 68, 68, 0.12); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.3);" onclick="window.handleSuspendRental('${rentalId || r.id}')">
+                  <button class="btn-pill" style="font-size: 0.80rem; padding: 6px 12px; background: rgba(239, 68, 68, 0.12); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.3);" onclick="window.handleSuspendRental('${r.id}')">
                     ⛔ Deny Access / Revoke License
                   </button>
                   <button class="btn-pill btn-pill-subtle" onclick="window.handleOwnerInspectEvent('${r.eventKey}')" style="font-size: 0.80rem; padding: 6px 12px;">
@@ -3438,30 +3500,39 @@
       }
     }
 
-    // 3. Render Fleet Events List (Streamlined: Access Management & Grand Purge only)
+    // 3. Render Running Events List (Streamlined: Access Management & Grand Purge only)
     const fleetEl = document.getElementById('owner-active-events-list');
-    if (fleetEl && data.events) {
-      const eventKeys = Object.keys(data.events);
-      if (eventKeys.length === 0) {
-        fleetEl.innerHTML = `<div style="text-align: center; padding: 32px; color: var(--text-muted);">No events registered on platform.</div>`;
+    if (fleetEl) {
+      if (allRunningKeys.length === 0) {
+        fleetEl.innerHTML = `<div style="text-align: center; padding: 36px 20px; color: var(--text-muted); font-size: 0.95rem;">
+          <div style="font-size: 2rem; margin-bottom: 8px;">🎪</div>
+          <strong>No active events currently hosted</strong>
+          <div style="font-size: 0.82rem; margin-top: 4px;">Approved events will automatically appear here once hosted.</div>
+        </div>`;
       } else {
-        fleetEl.innerHTML = eventKeys.map(key => {
-          const ev = data.events[key];
-          const rental = rentals.find(r => (r.eventKey || '').toUpperCase() === key.toUpperCase());
-          const countersCount = (ev.counters || []).length;
+        fleetEl.innerHTML = allRunningKeys.map(key => {
+          const ev = (data.events && data.events[key]) || {};
+          const rental = rentals.find(r => (r.eventKey || '').toUpperCase().trim() === key.toUpperCase());
+          const eventName = ev.name || (rental ? rental.eventName : key);
+          const bookTitle = ev.bookTitle || (rental ? rental.bookTitle : 'Commemorative Book');
+          const unitPrice = ev.unitPrice || (rental ? rental.unitPrice : 100);
+          const hostEmail = (rental && rental.hostEmail) || 'safwanvgd313@gmail.com';
+          const countersCount = (ev.counters && ev.counters.length) || (rental && rental.allowedCounters) || 1;
           const status = rental ? rental.status : 'ACTIVE';
           const isExpired = rental && rental.expiresAt && new Date() > new Date(rental.expiresAt);
+          const createdDate = ev.createdAt ? new Date(ev.createdAt).toLocaleDateString() : (rental && rental.requestedAt ? new Date(rental.requestedAt).toLocaleDateString() : 'Active');
+          const expiryDate = rental && rental.expiresAt ? new Date(rental.expiresAt).toLocaleDateString() : 'Permanent';
 
           return `
             <div class="rental-item-card">
               <div class="rental-card-header">
                 <div>
                   <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-weight: 800; font-size: 1.05rem;">${ev.name || key}</span>
+                    <span style="font-weight: 800; font-size: 1.05rem;">${eventName}</span>
                     <span class="font-mono" style="background: rgba(0,102,255,0.12); color: #0066FF; font-weight: 800; padding: 2px 8px; border-radius: 6px; font-size: 0.80rem;">${key}</span>
                   </div>
                   <div style="font-size: 0.80rem; color: var(--text-secondary); margin-top: 3px;">
-                    Book: <strong>${ev.bookTitle || 'Untitled'}</strong> (₹${ev.unitPrice || 100}) • Host: ${rental ? rental.hostEmail : 'Master Admin'}
+                    Book: <strong>${bookTitle}</strong> (₹${unitPrice}) • Host: <a href="mailto:${hostEmail}" style="color: #0066FF; text-decoration: none;">${hostEmail}</a>
                   </div>
                 </div>
                 <span class="rental-badge ${isExpired ? 'expired' : (status === 'ACTIVE' ? 'active' : 'denied')}">
@@ -3476,15 +3547,15 @@
                 </div>
                 <div class="rental-meta-cell">
                   <span class="rental-meta-title">License Expiry</span>
-                  <span class="rental-meta-val">${rental && rental.expiresAt ? new Date(rental.expiresAt).toLocaleDateString() : 'Permanent'}</span>
+                  <span class="rental-meta-val">${expiryDate}</span>
                 </div>
                 <div class="rental-meta-cell">
                   <span class="rental-meta-title">Assigned Host</span>
-                  <span class="rental-meta-val">${rental ? rental.hostEmail : 'safwanvgd313@gmail.com'}</span>
+                  <span class="rental-meta-val">${hostEmail}</span>
                 </div>
                 <div class="rental-meta-cell">
                   <span class="rental-meta-title">Created Date</span>
-                  <span class="rental-meta-val">${ev.createdAt ? new Date(ev.createdAt).toLocaleDateString() : 'Active'}</span>
+                  <span class="rental-meta-val">${createdDate}</span>
                 </div>
               </div>
 
@@ -3500,7 +3571,7 @@
                     ⛔ Deny Access / Revoke
                   </button>
                 ` : ''}
-                <button class="btn-pill btn-purge-danger" onclick="window.handleOwnerPurgeEvent('${key}', '${(ev.name || key).replace(/'/g, "\\'")}')">
+                <button class="btn-pill btn-purge-danger" onclick="window.handleOwnerPurgeEvent('${key}', '${eventName.replace(/'/g, "\\'")}')">
                   🗑️ Delete Event & Purge Data
                 </button>
               </div>
@@ -3973,9 +4044,24 @@
         updateSyncIndicator('syncing', 'Syncing...');
         setTimeout(() => updateSyncIndicator('synced', 'Cloud Live'), 1000);
       }
-    } else if (eventType === 'RENTALS_SYNC') {
+    } else if (eventType === 'RENTALS_SYNC' || eventType === 'EVENTS_ALL_SYNC') {
       if (state.currentView === 'owner-portal') renderOwnerPortal();
-      if (state.currentView === 'rental-status') renderRentalStatusView();
+      if (state.currentView === 'rental-status') {
+        const user = state.currentUser || (CS_Store.getSession() ? CS_Store.getSession().user : null);
+        if (user && user.email) {
+          const updatedRental = CS_Store.getRentalByEmail(user.email);
+          if (updatedRental && updatedRental.status === 'ACTIVE' && (!updatedRental.expiresAt || new Date() <= new Date(updatedRental.expiresAt))) {
+            showToast('Congratulations! Your rental application was approved by the platform owner.', 'success');
+            state.role = 'ADMIN';
+            state.eventKey = updatedRental.eventKey;
+            CS_Store.setSession({ role: 'ADMIN', eventKey: updatedRental.eventKey, user });
+            CS_Store.initCloudSync(updatedRental.eventKey);
+            navigateTo('admin');
+            return;
+          }
+        }
+        renderRentalStatusView();
+      }
     }
 
     if (state.currentView === 'pos') {
